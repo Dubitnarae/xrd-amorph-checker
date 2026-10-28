@@ -37,12 +37,21 @@ def _set_yscale(ax, yscale: str) -> None:
         ax.set_ylim(bottom=0)
 
 
+def _prepare(fig: Figure | None, figsize) -> Figure:
+    """새 Figure를 만들거나(보고서), 화면 캔버스의 Figure를 비워서 다시 쓴다(GUI)."""
+    if fig is None:
+        return Figure(figsize=figsize, layout="constrained")
+    fig.clear()
+    fig.set_layout_engine("constrained")
+    return fig
+
+
 def make_figure(r: AnalysisResult, yscale: str = "sqrt", show_phases: bool = True,
-                figsize=(10, 6.5)) -> Figure:
+                figsize=(10, 6.5), fig: Figure | None = None) -> Figure:
     import matplotlib
 
     with matplotlib.rc_context(_rc()):
-        fig = Figure(figsize=figsize, layout="constrained")
+        fig = _prepare(fig, figsize)
         ax, axz = fig.subplots(2, 1, sharex=True, height_ratios=[3, 1])
         p = r.pattern
         x, y = p.two_theta, p.counts
@@ -89,6 +98,62 @@ def make_figure(r: AnalysisResult, yscale: str = "sqrt", show_phases: bool = Tru
         axz.set_xlim(x[0], x[-1])
         fig.text(0.995, 0.002, f"xrdcheck v{r.version}", ha="right", va="bottom", fontsize=6, color="#9e9e9e")
     return fig
+
+
+def halo_height(r: AnalysisResult) -> float:
+    """정규화 기준: 주 halo 성분의 최대값(없으면 최대 counts)."""
+    if r.halo is not None:
+        return float(np.max(r.halo.components["주 halo"])) or 1.0
+    return max(r.pattern.max_counts, 1.0)
+
+
+def make_compare_figure(results: list[AnalysisResult], mode: str = "overlay", normalize: bool = True,
+                        yscale: str = "linear", figsize=(10, 6.5), fig: Figure | None = None) -> Figure:
+    """여러 시료 비교. mode = "overlay"(겹치기) | "stack"(세로로 나눠 보기). normalize면 halo 높이로 나눈다."""
+    import matplotlib
+
+    with matplotlib.rc_context(_rc()):
+        fig = _prepare(fig, figsize)
+        n = max(len(results), 1)
+        axes = [fig.add_subplot(1, 1, 1)] if mode == "overlay" else list(fig.subplots(n, 1, sharex=True, squeeze=False)[:, 0])
+        colors = matplotlib.colormaps["tab10"]
+        ylabel = "강도 / halo 높이" if normalize else "강도 (counts)"
+        for i, r in enumerate(results):
+            ax = axes[0] if mode == "overlay" else axes[i]
+            scale = halo_height(r) if normalize else 1.0
+            x = r.pattern.two_theta
+            label = f"{r.pattern.sample_name} [{r.verdict.value}]"
+            ax.plot(x, r.pattern.counts / scale, color=colors(i % 10), lw=0.7, label=label)
+            for pk in r.counted_peaks:
+                j = int(np.argmin(np.abs(x - pk.two_theta)))
+                ax.plot(pk.two_theta, r.pattern.counts[j] / scale * 1.05, marker="v", ms=6, ls="none",
+                        color=colors(i % 10), mfc=colors(i % 10) if pk.significant else "none")
+            if mode == "stack":
+                ax.legend(loc="upper right", fontsize=8)
+                ax.set_ylabel(ylabel if n == 1 else "")
+        for ax in axes:
+            _set_yscale(ax, yscale)
+        if mode == "overlay":
+            axes[0].legend(loc="upper right", fontsize=8)
+            axes[0].set_ylabel(ylabel)
+        else:
+            fig.supylabel(ylabel, fontsize=10)
+        axes[-1].set_xlabel("2θ (°)")
+        if results:
+            axes[-1].set_xlim(min(r.pattern.two_theta[0] for r in results), max(r.pattern.two_theta[-1] for r in results))
+        fig.suptitle(f"시료 비교 ({len(results)}개{', halo 높이로 정규화' if normalize else ''})", fontsize=10,
+                     x=0.01, ha="left")
+    return fig
+
+
+def save_figure(fig: Figure, path: str | Path, dpi: int = 300) -> Path:
+    import matplotlib
+
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with matplotlib.rc_context(_rc()):
+        fig.savefig(path, dpi=dpi)
+    return path
 
 
 def save_png(r: AnalysisResult, path: str | Path, yscale: str = "sqrt", dpi: int = 300) -> Path:

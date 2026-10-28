@@ -1,6 +1,9 @@
 {
   "_comment": "판정 기준값. 코드에 박지 않고 여기서 읽는다. 값을 바꾸면 DEVLOG에 이유를 남길 것.",
   "settings_version": 1,
+  "io": {
+    "filename_date_regex": ""
+  },
   "instrument_fwhm_deg": 0.15,
   "z_detect": 5.0,
   "z_suspect": 4.5,

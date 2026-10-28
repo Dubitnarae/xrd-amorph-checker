@@ -248,3 +248,15 @@ def test_sample_files_are_not_modified(sample_file, tmp_path):
     shutil.copy2(src, copy)
     load_pattern(src)
     assert src.read_bytes() == copy.read_bytes()
+
+
+@pytest.mark.parametrize(
+    "name, regex, expected_date",
+    [
+        ("X-0911-2026.xrdml", r"(?P<m>\d{2})(?P<d>\d{2})-(?P<y>\d{4})", dt.date(2026, 9, 11)),
+        ("SMP-01a-260910-001.xrdml", r"-(?P<yy>\d{2})(?P<m>\d{2})(?P<d>\d{2})-", dt.date(2026, 9, 10)),
+        ("SMP-01a-260910-001.xrdml", r"(?P<y>\d{4})-(?P<m>\d{2})", dt.date(2026, 9, 10)),  # 그룹 부족 → 기본 규칙
+    ],
+)
+def test_date_from_filename_user_regex(name, regex, expected_date):
+    assert date_from_filename(name, regex) == expected_date

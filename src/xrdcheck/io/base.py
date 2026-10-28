@@ -40,9 +40,25 @@ def _make_date(y: int, m: int, d: int) -> dt.date | None:
     return date
 
 
-def date_from_filename(name: str) -> dt.date | None:
-    """파일명에서 YYYYMMDD 또는 YYMMDD(6자리 숫자 덩어리)를 찾는다. 예: SMP-01a-260910-001 → 2026-09-10."""
+def date_from_regex(stem: str, regex: str) -> dt.date | None:
+    """사용자 정규식. 이름 붙은 그룹 y(4자리) 또는 yy(2자리), m, d를 쓴다. 예: (?P<yy>\d{2})(?P<m>\d{2})(?P<d>\d{2})"""
+    m = re.search(regex, stem)
+    if not m:
+        return None
+    g = m.groupdict()
+    try:
+        year = int(g["y"]) if g.get("y") else 2000 + int(g["yy"])
+        return _make_date(year, int(g["m"]), int(g["d"]))
+    except (KeyError, TypeError, ValueError):
+        return None
+
+
+def date_from_filename(name: str, regex: str | None = None) -> dt.date | None:
+    """파일명에서 날짜를 찾는다. 사용자 정규식이 있으면 먼저 쓰고, 없거나 안 맞으면
+    YYYYMMDD 또는 YYMMDD(6자리 숫자 덩어리). 예: SMP-01a-260910-001 → 2026-09-10."""
     stem = Path(name).stem
+    if regex and (date := date_from_regex(stem, regex)):
+        return date
     for m in _DATE8.finditer(stem):
         if date := _make_date(int(m[1]), int(m[2]), int(m[3])):
             return date
@@ -72,9 +88,9 @@ def year_of_timestamp(raw: str) -> int | None:
     return int(m[1]) if m else None
 
 
-def resolve_measurement_date(p: Pattern, user_date: dt.date | None = None) -> None:
+def resolve_measurement_date(p: Pattern, user_date: dt.date | None = None, filename_regex: str | None = None) -> None:
     """파일명 → 폴더 경로(RTF의 원본 경로 우선) → 사용자 입력 순으로 측정일을 정한다."""
-    candidates: dict[str, dt.date | None] = {"파일명": date_from_filename(p.source_path.name)}
+    candidates: dict[str, dt.date | None] = {"파일명": date_from_filename(p.source_path.name, filename_regex)}
     folder = None
     for path in (p.meta.get("original_path"), str(p.source_path.resolve())):
         if path and (folder := date_from_folder(path)):
@@ -106,7 +122,8 @@ def _sibling_rtf(path: Path) -> Path | None:
     return None
 
 
-def load_pattern(path: str | Path, *, user_date: dt.date | None = None, read_rtf: bool = True) -> Pattern:
+def load_pattern(path: str | Path, *, user_date: dt.date | None = None, read_rtf: bool = True,
+                 filename_regex: str | None = None) -> Pattern:
     """확장자와 내용을 보고 알맞은 파서로 읽은 뒤, 같은 이름의 RTF 메타와 측정일을 붙인다."""
     path = Path(path)
     suffix = path.suffix.lower()
@@ -127,5 +144,5 @@ def load_pattern(path: str | Path, *, user_date: dt.date | None = None, read_rtf
         p.meta.update(rtf_meta)
         p.meta["rtf_path"] = str(rtf)
 
-    resolve_measurement_date(p, user_date)
+    resolve_measurement_date(p, user_date, filename_regex)
     return p

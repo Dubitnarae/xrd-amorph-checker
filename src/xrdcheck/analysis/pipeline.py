@@ -21,7 +21,9 @@ from xrdcheck.settings import load_settings
 
 
 def analyze_file(path: str | Path, settings: dict | None = None, library: list[dict] | None = None) -> AnalysisResult:
-    return analyze(load_pattern(path), settings, library)
+    settings = settings or load_settings()
+    regex = settings.get("io", {}).get("filename_date_regex") or None
+    return analyze(load_pattern(path, filename_regex=regex), settings, library)
 
 
 def _detect(x, y, mu, doublet, settings):

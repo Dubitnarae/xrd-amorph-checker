@@ -12,10 +12,11 @@ dependencies = [
     "scipy>=1.11",
     "matplotlib>=3.8",
     "openpyxl>=3.1",
+    "PySide6>=6.6",
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8"]
+dev = ["pytest>=8", "pytest-qt>=4.4"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
@@ -26,3 +27,7 @@ xrdcheck = ["data/*.json"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-ra"
+filterwarnings = [
+    # matplotlib Qt 백엔드 내부의 폐기 예정 Qt 옵션 사용(우리 코드와 무관)
+    "ignore:Enum value .Qt::ApplicationAttribute.AA_UseHighDpiPixmaps.:DeprecationWarning",
+]

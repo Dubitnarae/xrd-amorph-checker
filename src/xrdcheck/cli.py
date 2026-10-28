@@ -104,6 +104,12 @@ def cmd_analyze(args) -> int:
     return 1 if failed else 0
 
 
+def cmd_gui(args) -> int:
+    from xrdcheck.gui.app import run
+
+    return run(args.paths)
+
+
 def build_parser() -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser(prog="xrdcheck", description=f"XRD 비정질 판정 도우미 v{__version__}")
     ap.add_argument("--version", action="version", version=f"xrdcheck {__version__}")
@@ -120,8 +126,9 @@ def build_parser() -> argparse.ArgumentParser:
     a.add_argument("-r", "--recursive", action="store_true", help="하위 폴더까지 찾기")
     a.set_defaults(func=cmd_analyze)
 
-    g = sub.add_parser("gui", help="화면 실행(Phase 3에서 구현)")
-    g.set_defaults(func=lambda _a: print("GUI는 아직 구현되지 않았습니다(Phase 3).") or 1)
+    g = sub.add_parser("gui", help="화면 실행")
+    g.add_argument("paths", nargs="*", help="처음에 열 파일 또는 폴더")
+    g.set_defaults(func=cmd_gui)
     return ap
 
 
