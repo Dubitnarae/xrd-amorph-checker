@@ -22,3 +22,7 @@ def test_icon_is_packaged():
 def test_default_settings_is_valid_json():
     text = resources.files("xrdcheck").joinpath("data/default_settings.json").read_text(encoding="utf-8")
     assert isinstance(json.loads(text), dict)
+
+
+def test_author():
+    assert xrdcheck.__author__ == "KIM YEONGDO"

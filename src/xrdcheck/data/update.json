@@ -1,0 +1,5 @@
+{
+  "_설명": "자동 업데이트 출처. folder를 채우면(예: \\\\NAS\\공유\\XRD_Checker) 그 폴더의 XRD_Checker_v*.zip을 쓰고, 비우면 GitHub 공개 저장소의 최신 릴리스를 쓴다. 사용자별로 바꾸려면 %APPDATA%\\xrdcheck\\update.json에 같은 키를 적는다.",
+  "github_repo": "Dubitnarae/xrd-amorph-checker",
+  "folder": ""
+}

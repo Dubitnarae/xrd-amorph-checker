@@ -21,7 +21,10 @@ def run(paths: list[str] | None = None) -> int:
     from PySide6.QtGui import QFont, QIcon
     from PySide6.QtWidgets import QApplication
 
+    from xrdcheck import updater
     from xrdcheck.gui.main_window import APP_TITLE, MainWindow
+
+    updater.cleanup()  # 지난 업데이트의 임시·백업 폴더
 
     app = QApplication.instance() or QApplication(sys.argv)
     app.setApplicationName(APP_TITLE)

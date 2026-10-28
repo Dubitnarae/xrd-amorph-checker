@@ -2,20 +2,22 @@
 
 from __future__ import annotations
 
+import time
 from pathlib import Path
 
-from PySide6.QtCore import QSettings, Qt
-from PySide6.QtGui import QAction, QKeySequence
-from PySide6.QtWidgets import (QFileDialog, QLabel, QMainWindow, QMessageBox, QProgressBar, QSplitter,
-                               QToolBar)
+from PySide6.QtCore import QSettings, Qt, QTimer, QUrl
+from PySide6.QtGui import QAction, QDesktopServices, QKeySequence
+from PySide6.QtWidgets import (QApplication, QFileDialog, QLabel, QMainWindow, QMessageBox, QProgressBar,
+                               QProgressDialog, QSplitter, QToolBar)
 
-from xrdcheck import __version__
+from xrdcheck import __author__, __version__, updater
 from xrdcheck.cli import collect_files
 from xrdcheck.gui.storage import UserStore
 from xrdcheck.gui.widgets.detail_panel import DetailPanel
 from xrdcheck.gui.widgets.plot_view import PlotView
 from xrdcheck.gui.widgets.result_table import ResultTable, result_key
 from xrdcheck.gui.widgets.settings_dialog import SettingsDialog
+from xrdcheck.gui.widgets.update_worker import UpdateCheckWorker, UpdateDownloadWorker
 from xrdcheck.gui.widgets.worker import AnalysisWorker
 from xrdcheck.io import SUPPORTED_SUFFIXES
 from xrdcheck.model import AnalysisResult
@@ -25,6 +27,7 @@ from xrdcheck.report.figure import make_compare_figure, make_figure, save_figure
 
 APP_TITLE = "XRD 비정질 판정 도우미"
 MAX_RECENT = 5
+UPDATE_INTERVAL_S = 24 * 3600  # 자동 확인은 하루 한 번
 FILE_FILTER = "XRD 파일 (" + " ".join(f"*{s}" for s in SUPPORTED_SUFFIXES) + ");;모든 파일 (*.*)"
 
 
@@ -41,6 +44,11 @@ class MainWindow(QMainWindow):
         self.worker: AnalysisWorker | None = None
         self.errors: list[tuple[str, str]] = []
         self._select_after: str | None = None
+        self.update_cfg = updater.load_config(self.store.dir)
+        self.available_release: updater.Release | None = None  # 마지막 확인 결과(테스트에서도 씀)
+        self.update_error: str | None = None
+        self._update_check: UpdateCheckWorker | None = None
+        self._update_dl: UpdateDownloadWorker | None = None
 
         self.setWindowTitle(f"{APP_TITLE} v{__version__}")
         self.setAcceptDrops(True)
@@ -67,6 +75,9 @@ class MainWindow(QMainWindow):
         self.table.itemSelectionChanged.connect(self.refresh_view)
         self.plot.options_changed.connect(self.refresh_view)
         self._restore_state()
+        if show_dialogs and self.auto_update_check() and \
+                time.time() - float(self.qs.value("update/last_check", 0) or 0) > UPDATE_INTERVAL_S:
+            QTimer.singleShot(2000, lambda: self.check_updates(silent=True))
 
     # ------------------------------------------------------------ 메뉴·도구
     def _act(self, text, slot, shortcut=None, checkable=False, tip=None) -> QAction:
@@ -96,6 +107,9 @@ class MainWindow(QMainWindow):
         self.act_reanalyze = self._act("다시 분석", self.reanalyze_all, "F5")
         self.act_settings = self._act("설정", self.open_settings, "Ctrl+,")
         self.act_about = self._act("정보", self.show_about)
+        self.act_update = self._act("업데이트 확인…", lambda: self.check_updates(silent=False))
+        self.act_auto_update = self._act("시작할 때 업데이트 확인", self._set_auto_update, checkable=True)
+        self.act_auto_update.setChecked(self.auto_update_check())
 
         tb = QToolBar("주 도구")
         tb.setMovable(False)
@@ -119,6 +133,9 @@ class MainWindow(QMainWindow):
         m = self.menuBar().addMenu("도구")
         m.addAction(self.act_settings)
         m = self.menuBar().addMenu("도움말")
+        m.addAction(self.act_update)
+        m.addAction(self.act_auto_update)
+        m.addSeparator()
         m.addAction(self.act_about)
         self._update_recent_menu()
 
@@ -165,6 +182,9 @@ class MainWindow(QMainWindow):
             self.pending.clear()
             self.worker.requestInterruption()
             self.worker.wait(10000)
+        for t in (self._update_check, self._update_dl):
+            if t is not None:
+                t.wait(3000)
         super().closeEvent(event)
 
     # ------------------------------------------------------------ 파일 열기
@@ -385,9 +405,116 @@ class MainWindow(QMainWindow):
 
     def show_about(self) -> None:
         QMessageBox.about(self, "정보",
-                          f"<b>{APP_TITLE}</b> v{__version__}<br><br>"
+                          f"<b>{APP_TITLE}</b> v{__version__}<br>개발자: {__author__}<br><br>"
                           "비정질 halo를 피팅하고 결정 피크를 통계적으로 찾아<br>"
                           "비정질 / 결정상 의심 / 결정상 검출 / 나노결정상 후보 / 판정 불가로 판정합니다.<br>"
                           "나노결정상 후보: 주 halo 위 결정 피크의 Scherrer 크기가 10–90 nm인 경우<br><br>"
                           "판정은 보조 수단입니다. 근거(그래프·수치·검출한계)를 확인하고 최종 판단은 사람이 합니다."
-                          f"<br><br>사용자 설정 폴더: {self.store.dir}")
+                          f"<br><br>사용자 설정 폴더: {self.store.dir}"
+                          f"<br>업데이트 출처: {updater.source_label(self.update_cfg)}")
+
+    # ------------------------------------------------------------ 자동 업데이트
+    def auto_update_check(self) -> bool:
+        return str(self.qs.value("update/auto_check", "true")).lower() == "true"
+
+    def _set_auto_update(self, on: bool) -> None:
+        self.qs.setValue("update/auto_check", "true" if on else "false")
+
+    def check_updates(self, silent: bool = False) -> UpdateCheckWorker | None:
+        """새 버전 확인. silent: 시작할 때 자동 확인 — 실패하거나 최신이면 아무것도 띄우지 않는다."""
+        if self._update_check is not None and self._update_check.isRunning():
+            return None
+        self.update_cfg = updater.load_config(self.store.dir)
+        w = UpdateCheckWorker(self.update_cfg, self)
+        w.found.connect(lambda rel: self._on_update_found(rel, silent))
+        w.failed.connect(lambda msg: self._on_update_failed(msg, silent))
+        self._update_check = w
+        if not silent:
+            self.status.setText("업데이트 확인 중…")
+        w.start()
+        return w
+
+    def _on_update_found(self, rel, silent: bool) -> None:
+        self.qs.setValue("update/last_check", time.time())
+        self.available_release, self.update_error = rel, None
+        if rel is None:
+            if not silent:
+                self.status.setText(f"최신 버전입니다(v{__version__}).")
+                if self.show_dialogs:
+                    QMessageBox.information(self, "업데이트", f"지금 쓰는 v{__version__}이 최신 버전입니다.")
+            return
+        self.status.setText(f"새 버전 v{rel.version}이 있습니다 — 도움말 > 업데이트 확인")
+        if not self.show_dialogs or (silent and self.qs.value("update/skip_version") == rel.version):
+            return
+        box = QMessageBox(self)
+        box.setWindowTitle("업데이트")
+        box.setIcon(QMessageBox.Information)
+        box.setText(f"새 버전 <b>v{rel.version}</b>이 있습니다(지금 v{__version__}).<br>지금 업데이트할까요?")
+        box.setInformativeText("업데이트하면 프로그램을 닫고 새 버전으로 바꾼 뒤 다시 엽니다. 설정은 그대로입니다.")
+        if rel.notes:
+            box.setDetailedText(rel.notes)
+        b_now = box.addButton("지금 업데이트", QMessageBox.AcceptRole)
+        box.addButton("나중에", QMessageBox.RejectRole)
+        b_skip = box.addButton("이 버전 건너뛰기", QMessageBox.DestructiveRole) if silent else None
+        box.exec()
+        if box.clickedButton() is b_now:
+            self.start_update(rel)
+        elif b_skip is not None and box.clickedButton() is b_skip:
+            self.qs.setValue("update/skip_version", rel.version)
+
+    def _on_update_failed(self, msg: str, silent: bool) -> None:
+        self.update_error = msg
+        if silent:
+            return  # 회사망·오프라인에서 시작할 때마다 경고하지 않는다
+        self.status.setText("업데이트 확인 실패")
+        if self.show_dialogs:
+            QMessageBox.warning(self, "업데이트", msg)
+
+    def _open_release_page(self, rel) -> None:
+        if rel.page_url:
+            url = QUrl(rel.page_url) if rel.page_url.startswith("http") else QUrl.fromLocalFile(rel.page_url)
+            QDesktopServices.openUrl(url)
+
+    def start_update(self, rel) -> None:
+        ok, why = updater.can_self_update()
+        if not ok:
+            if QMessageBox.question(self, "업데이트", why + "\n\n릴리스 위치를 열까요?") == QMessageBox.Yes:
+                self._open_release_page(rel)
+            return
+        if self.is_busy() and QMessageBox.question(
+                self, "업데이트", "분석 중입니다. 멈추고 업데이트할까요?") != QMessageBox.Yes:
+            return
+        dlg = QProgressDialog(f"v{rel.version} 내려받는 중…", "취소", 0, 0, self)
+        dlg.setWindowTitle("업데이트")
+        dlg.setWindowModality(Qt.WindowModal)
+        dlg.setMinimumDuration(0)
+        w = UpdateDownloadWorker(rel, self)
+        self._update_dl = w
+        cancelled = []
+
+        def on_progress(done_kb: int, total_kb: int) -> None:
+            if total_kb and not cancelled:
+                dlg.setMaximum(total_kb)
+                dlg.setValue(min(done_kb, total_kb))
+                dlg.setLabelText(f"v{rel.version} 내려받는 중… {done_kb / 1024:.0f} / {total_kb / 1024:.0f} MB")
+
+        def on_ready(app_dir: str) -> None:
+            dlg.close()
+            if cancelled:
+                return
+            QMessageBox.information(self, "업데이트",
+                                    f"v{rel.version}을 설치합니다. 프로그램이 잠시 닫혔다가 새 버전으로 다시 열립니다.")
+            updater.launch_apply(Path(app_dir), updater.install_dir())
+            self.close()
+            QApplication.quit()
+
+        def on_failed(msg: str) -> None:
+            dlg.close()
+            if not cancelled:
+                QMessageBox.warning(self, "업데이트", msg)
+
+        w.progress.connect(on_progress)
+        w.ready.connect(on_ready)
+        w.failed.connect(on_failed)
+        dlg.canceled.connect(lambda: cancelled.append(True))
+        w.start()

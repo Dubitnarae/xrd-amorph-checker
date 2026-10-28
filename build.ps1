@@ -16,7 +16,10 @@ Write-Host "버전 $version 빌드 시작"
 & $py -m pytest -q
 if ($LASTEXITCODE -ne 0) { throw "테스트 실패 — 빌드 중단" }
 
+& $py packaging\make_version_info.py build\version_info.txt
+if ($LASTEXITCODE -ne 0) { throw "버전 정보 만들기 실패" }
 & $py -m PyInstaller --noconfirm --clean --onedir --windowed `
+    --version-file build\version_info.txt `
     --name XRD_Checker `
     --icon src\xrdcheck\data\icon.ico `
     --collect-data xrdcheck `
