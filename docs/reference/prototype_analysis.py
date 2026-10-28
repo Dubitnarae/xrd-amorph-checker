@@ -2,13 +2,13 @@
 참고용 프로토타입 — 계획 수립 시 알고리즘과 기대값을 검증하려고 만든 단일 스크립트.
 
 * 실제 구현은 PLAN.md의 폴더 구조(src/xrdcheck/...)로 나눠 다시 작성할 것.
-* 이 파일의 출력값이 tests/expected/SMP-01a-260910-001.json 의 근거임.
+* 이 파일의 출력값이 tests/expected/<시료>.json 의 근거임.
 
 사용법
-    python prototype_analysis.py ../../samples/SMP-01a-260910-001.xrdml
-    python prototype_analysis.py ../../samples/SMP-01a-260910-001.csv
+    python prototype_analysis.py ../../samples/<시료>.xrdml
+    python prototype_analysis.py ../../samples/<시료>.csv
     # 가상 결정 피크 주입 테스트 (위치:높이[counts], FWHM 0.15°)
-    python prototype_analysis.py ../../samples/SMP-01a-260910-001.xrdml --inject 44.67:40,65.02:15
+    python prototype_analysis.py ../../samples/<시료>.xrdml --inject 44.67:40,65.02:15
 
 필요 패키지: numpy, scipy
 """

@@ -6,7 +6,15 @@ import pytest
 ROOT = Path(__file__).resolve().parents[1]
 SAMPLES = ROOT / "samples"
 EXPECTED = ROOT / "tests" / "expected"
-SAMPLE_STEM = "SMP-01a-260910-001"
+
+
+def _sample_stem() -> str:
+    """실측 샘플 파일 이름(확장자 제외). 실제 시료명은 비공개라 tests/private/sample_stem.txt에만 둔다."""
+    p = ROOT / "tests" / "private" / "sample_stem.txt"
+    return p.read_text(encoding="utf-8").strip() if p.exists() else "SMP-01a-260910-001"
+
+
+SAMPLE_STEM = _sample_stem()
 
 
 @pytest.fixture
@@ -20,6 +28,11 @@ def sample_file():
         return path
 
     return get
+
+
+@pytest.fixture
+def sample_stem():
+    return SAMPLE_STEM
 
 
 @pytest.fixture

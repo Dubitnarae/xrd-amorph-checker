@@ -52,15 +52,16 @@ def test_sample_date_not_from_internal_timestamp(sample_file, expected, suffix):
     assert any("2003" in w and "비정상" in w for w in p.warnings) == expected["io"]["expect_date_warning"]
 
 
-def test_rtf_meta(sample_file):
+def test_rtf_meta(sample_file, sample_stem):
     meta = read_rtf_meta(sample_file(".RTF"))
-    assert meta["original_path"] == r"C:\X'Pert Data\2026\DATA\0911-xrd\SMP-01a-260910-001.xrdml"
-    assert meta["dataset_name"] == "SMP-01a-260910-001"
+    assert meta["original_path"].startswith("C:\\X'Pert Data\\2026\\")
+    assert meta["original_path"].endswith("\\" + sample_stem + ".xrdml")
+    assert meta["dataset_name"] == sample_stem
 
 
-def test_rtf_original_path_gives_folder_date(sample_file):
+def test_rtf_original_path_gives_folder_date(sample_file, sample_stem):
     p = load_pattern(sample_file(".xrdml"))
-    assert p.meta["original_path"].endswith("SMP-01a-260910-001.xrdml")
+    assert p.meta["original_path"].endswith(sample_stem + ".xrdml")
     assert p.meta["date_candidates"]["폴더 경로"] == "2026-09-11"
 
 
@@ -253,7 +254,7 @@ def test_sample_files_are_not_modified(sample_file, tmp_path):
 @pytest.mark.parametrize(
     "name, regex, expected_date",
     [
-        ("X-0911-2026.xrdml", r"(?P<m>\d{2})(?P<d>\d{2})-(?P<y>\d{4})", dt.date(2026, 9, 11)),
+        ("SMP-0911-2026.xrdml", r"(?P<m>\d{2})(?P<d>\d{2})-(?P<y>\d{4})", dt.date(2026, 9, 11)),
         ("SMP-01a-260910-001.xrdml", r"-(?P<yy>\d{2})(?P<m>\d{2})(?P<d>\d{2})-", dt.date(2026, 9, 10)),
         ("SMP-01a-260910-001.xrdml", r"(?P<y>\d{4})-(?P<m>\d{2})", dt.date(2026, 9, 10)),  # 그룹 부족 → 기본 규칙
     ],

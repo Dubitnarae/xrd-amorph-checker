@@ -8,15 +8,15 @@ from openpyxl import load_workbook
 from xrdcheck.cli import collect_files, main
 
 
-def test_cli_end_to_end(sample_file, tmp_path, capsys):
+def test_cli_end_to_end(sample_file, sample_stem, tmp_path, capsys):
     src = sample_file(".xrdml")
     out = tmp_path / "result.xlsx"
     code = main(["analyze", str(src.parent), "--out", str(out), "--png", str(tmp_path / "figs"),
                  "--csv", str(tmp_path / "data")])
     assert code == 0
     text = capsys.readouterr().out
-    assert "[비정질] SMP-01a-260910-001.xrdml" in text
-    assert "건너뜀(같은 이름의 .xrdml 사용): SMP-01a-260910-001.csv" in text
+    assert f"[비정질] {sample_stem}.xrdml" in text
+    assert f"건너뜀(같은 이름의 .xrdml 사용): {sample_stem}.csv" in text
 
     wb = load_workbook(out)
     assert wb.sheetnames == ["요약", "피크", "설정·버전"]
@@ -28,10 +28,10 @@ def test_cli_end_to_end(sample_file, tmp_path, capsys):
     info = {r[0]: r[1] for r in wb["설정·버전"].iter_rows(min_row=2, values_only=True)}
     assert info["z_detect"] == "5.0" and info["버전"]
 
-    png = tmp_path / "figs" / "SMP-01a-260910-001.png"
+    png = tmp_path / "figs" / f"{sample_stem}.png"
     assert png.read_bytes()[:8] == b"\x89PNG\r\n\x1a\n"
 
-    data = tmp_path / "data" / "SMP-01a-260910-001_processed.csv"
+    data = tmp_path / "data" / f"{sample_stem}_processed.csv"
     assert data.read_bytes()[:3] == b"\xef\xbb\xbf"  # utf-8-sig
     with data.open(encoding="utf-8-sig") as f:
         rows = list(csv.reader(f))
