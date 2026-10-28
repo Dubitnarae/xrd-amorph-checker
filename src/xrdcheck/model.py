@@ -98,6 +98,7 @@ class Peak:
     level: str  # "검출"(z ≥ 검출 기준) | "의심"
     refined: bool = True  # 국소 피팅 성공 여부(실패하면 z로 추정한 값)
     eta: float = 0.5  # pseudo-Voigt 로렌츠 비율
+    fwhm_err: float | None = None  # FWHM 피팅 표준오차(°)
     matches: list[str] = field(default_factory=list)  # 예: ["α-Fe(110)"]
     match_confidence: str = ""  # "높음" | "낮음" | ""
     satellite_of: float | None = None  # 더 강한 피크의 Kα2·꼬리로 판단되면 그 피크의 2θ
@@ -139,6 +140,8 @@ class AnalysisResult:
     fit_mask: np.ndarray | None = field(default=None, repr=False)  # halo 피팅에 쓴 점(True)
     refit_rounds: int = 0
     broad: dict | None = None
+    nano: dict | None = None  # 나노결정 판정(analysis/nano.py)
+    alloy_system: str = ""  # 판별한 합금계 표시명(예: "Fe계")
     phase_lines: list[dict] = field(default_factory=list, repr=False)  # 그래프용 상 기준선
     warnings: list[str] = field(default_factory=list)
 

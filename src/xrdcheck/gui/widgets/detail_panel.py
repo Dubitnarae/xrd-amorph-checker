@@ -40,6 +40,20 @@ def result_html(r: AnalysisResult) -> str:
            f"<p>{escape(r.sentence)}</p>"]
     if r.reasons:
         out.append("<p class='muted'>근거: " + escape(" / ".join(r.reasons)) + "</p>")
+    if r.nano:
+        lo, hi = r.nano["window"]
+        out.append(f"<p><b>{escape(r.nano['label'])}</b> <span class='muted'>— 주 halo 범위 {lo:.1f}–{hi:.1f}°"
+                   f"{', 피크 ' + ', '.join(f'{t:.2f}°' for t in r.nano['halo_peaks']) if r.nano['halo_peaks'] else ''}"
+                   f" · {escape(r.nano['note'])}</span></p>")
+        if r.nano.get("size"):
+            from xrdcheck.analysis.nano import format_size
+
+            s = r.nano["size"]
+            out.append("<h3>결정립 크기 (Scherrer)</h3><table>")
+            out.append(_row(f"D — {s['label']} {s['two_theta']:.2f}°", format_size(s)))
+            out.append(_row("측정 FWHM / 기기 FWHM", f"{s['fwhm_obs']:.3f}° / {s['fwhm_inst']:.3f}°"))
+            out += [_row(f"D — {o['label']} {o['two_theta']:.2f}°", format_size(o)) for o in r.nano["other_sizes"]]
+            out.append("</table>")
 
     if h is not None:
         out.append("<h3>halo</h3><table>")
@@ -94,6 +108,7 @@ def result_html(r: AnalysisResult) -> str:
     out += [
         _row("파일", p.source_path.name),
         _row("형식", p.file_format),
+        _row("합금계(자동 판별)", r.alloy_system or "-"),
         _row("측정일", f"{p.measurement_date.isoformat()} ({p.date_source})" if p.measurement_date else "미정"),
         _row("점 / 간격", f"{p.n_points} / {p.step_deg:.4f}°"),
         _row("최대 counts", f"{p.max_counts:.0f}"),

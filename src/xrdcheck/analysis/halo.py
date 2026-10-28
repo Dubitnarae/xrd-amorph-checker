@@ -73,7 +73,8 @@ def fit_halo(x: np.ndarray, y: np.ndarray, wavelength_A: float, settings: dict,
     model = HaloModel(float(x[0]), float((x[0] + x[-1]) / 2), with_second)
     cb = hs["center_bound_deg"]
     p0 = [A1, c1, 6.0, 6.0, 0.5]
-    lb = [0, c1 - cb, 1, 1, 0]
+    fmin = hs["fwhm_min_deg"]  # 비정질 halo는 이보다 좁을 수 없음 — 나노결정 피크를 halo가 흡수하는 것을 막음
+    lb = [0, c1 - cb, fmin, fmin, 0]
     ub = [10 * A1 + 10, c1 + cb, 15, 15, 1]
     if with_second:
         s_lo, s_hi = hs["second_range_deg"]

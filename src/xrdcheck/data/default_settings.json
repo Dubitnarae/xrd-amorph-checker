@@ -15,6 +15,7 @@
   "halo": {
     "search_range_deg": [38.0, 52.0],
     "center_bound_deg": 3.0,
+    "fwhm_min_deg": 3.0,
     "smooth_fwhm_deg": 0.5,
     "baseline_range_deg": [55.0, 75.0],
     "second_range_deg": [72.0, 88.0],
@@ -34,7 +35,7 @@
   "peak_refine": {
     "window_deg": 0.6,
     "center_shift_max_deg": 0.15,
-    "fwhm_range_deg": [0.05, 1.0]
+    "fwhm_range_deg": [0.05, 1.5]
   },
   "kalpha2": {
     "position_tolerance_deg": 0.05,
@@ -44,6 +45,20 @@
     "tolerance_deg": 0.25
   },
   "detection_limit_lines": ["α-Fe(110)", "α-Fe(200)", "α-Fe(211)"],
+  "alloy_systems": {
+    "_comment": "halo 중심 2θ로 합금계를 자동 판별해 그 합금계의 상만 매칭한다(phases.json의 systems).",
+    "Fe": {"label": "Fe계", "halo_center_range_deg": [41.0, 48.0], "ready": true},
+    "Al": {"label": "Al계", "halo_center_range_deg": [33.0, 41.0], "ready": false}
+  },
+  "nanocrystal": {
+    "_comment": "나노결정 필요조건: 주 halo 위(중심 ± 비율×FWHM) 결정 피크. 사용자 기준 2026-10-28",
+    "halo_window_fwhm_fraction": 0.5,
+    "scherrer_k": 0.9,
+    "_scherrer_comment": "기기 폭 b(2θ): 표준시료 미측정 — 실측 1,020개 중 강한 결정 피크(z ≥ 30) FWHM 하위 1–5%로 추정(2026-10-28). 순수 폭 β = √(B² − b²)",
+    "scherrer_instrument_fwhm_deg": [[44.7, 0.10], [65.0, 0.11], [82.5, 0.13]],
+    "scherrer_min_broadening_ratio": 1.2,
+    "scherrer_instrument_measured": false
+  },
   "broad_component": {
     "line": "α-Fe(110)",
     "center_window_deg": 0.4,

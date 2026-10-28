@@ -29,6 +29,21 @@ def _dl(r: AnalysisResult, label: str):
     return None
 
 
+def _size_cols(r: AnalysisResult) -> dict:
+    """나노결정 후보의 Scherrer 결정립 크기(nm)."""
+    from xrdcheck.analysis.nano import format_size
+
+    s = (r.nano or {}).get("size")
+    others = (r.nano or {}).get("other_sizes", [])
+    return {
+        "결정립 크기 D(nm)": _r(s["size_nm"], 1) if s and s["size_nm"] is not None and not s["limit"] else None,
+        "D 오차(nm)": _r(s["size_err_nm"], 1) if s and s["size_err_nm"] is not None and not s["limit"] else None,
+        "D 표기": format_size(s) if s else "",
+        "D 근거 피크": f"{s['label']} {s['two_theta']:.2f}° (FWHM {s['fwhm_obs']:.3f}°, 기기 {s['fwhm_inst']:.3f}°)" if s else "",
+        "다른 선 D": "; ".join(f"{o['label']} {format_size(o)}" for o in others),
+    }
+
+
 def summary_row(r: AnalysisResult, dl_labels: list[str]) -> dict:
     p, h, b = r.pattern, r.halo, r.broad or {}
     counted = r.counted_peaks
@@ -37,7 +52,10 @@ def summary_row(r: AnalysisResult, dl_labels: list[str]) -> dict:
         "시료명": p.sample_name,
         "측정일": p.measurement_date.isoformat() if p.measurement_date else "",
         "측정일 근거": p.date_source,
+        "합금계": r.alloy_system,
         "판정": r.verdict.value,
+        "나노결정": (r.nano or {}).get("label", ""),
+        **_size_cols(r),
         "결과 문장": r.sentence,
         "주 halo 2θ(°)": _r(h.center, 3) if h else None,
         "FWHM(°)": _r(h.fwhm, 2) if h else None,

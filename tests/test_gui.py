@@ -47,7 +47,8 @@ def test_open_folder_shows_verdict(window, qtbot, sample_file):
     _wait(qtbot, w)
     assert w.table.rowCount() == 1
     assert w.table.item(0, 1).text() == "비정질"
-    assert w.table.item(0, 2).text() == "44.76"
+    assert w.table.item(0, 2).text() == ""  # 비정질이면 나노결정 칸은 비움
+    assert w.table.item(0, 3).text() == "44.76"
     assert w.table.selected_keys()  # 첫 결과가 자동 선택됨
     html = w.detail.toPlainText()
     assert "비정질" in html and "검출한계" in html and "α-Fe(110)" in html

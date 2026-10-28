@@ -17,8 +17,13 @@ from pathlib import Path
 HEAT = re.compile(r"열처리|H\d{3}\b|H\d{3}(?=\D|$)|H-\d{3}|\d{3}-\d+H|ANNEAL|AFTER|CYCLE|싸이클|-CY", re.I)
 
 
+AL_ALLOY = re.compile(r"^(?:\d+-)*AL(?:YNICO|-?\d*Y|-STF)", re.I)  # 진짜 Al계(halo 약 38.6°)
+
+
 def series(name: str) -> str:
     s = name.upper().replace(" ", "")
+    if AL_ALLOY.match(s):
+        return "Al계"
     s = re.sub(r"^AL(?=[-_\dA-Z])", "A1", s)  # Al → A1 오타
     for key in ("HA", "HX"):
         if s.startswith(key):

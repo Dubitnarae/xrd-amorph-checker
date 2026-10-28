@@ -10,8 +10,9 @@ import numpy as np
 from xrdcheck import __version__
 from xrdcheck.analysis.broad import broad_indicator
 from xrdcheck.analysis.halo import HaloFitError, fit_halo
+from xrdcheck.analysis.nano import classify_nano
 from xrdcheck.analysis.peaks import Doublet, NarrowDetector, detect_peaks, flag_kalpha2
-from xrdcheck.analysis.phases import load_library, match_peaks, phase_lines
+from xrdcheck.analysis.phases import detect_system, load_library, match_peaks, phase_lines
 from xrdcheck.analysis.quality import check_quality
 from xrdcheck.analysis.verdict import decide
 from xrdcheck.io import load_pattern
@@ -71,7 +72,17 @@ def analyze(pattern: Pattern, settings: dict | None = None, library: list[dict] 
         return result
 
     flag_kalpha2(peaks, lam, pattern.kalpha2_A, settings)
-    lines = phase_lines(library, lam, float(x[0]), float(x[-1]))
+    system = detect_system(fit.center, settings)
+    if system is None:
+        result.warnings.append(f"halo 중심 {fit.center:.1f}°가 알려진 합금계 범위 밖입니다 — 모든 상으로 매칭했습니다. 결과를 그래프로 확인하세요.")
+        result.alloy_system = "미판별"
+    else:
+        info = settings["alloy_systems"][system]
+        result.alloy_system = info["label"]
+        if not info.get("ready", True):
+            result.warnings.append(f"{info['label']}로 보입니다(halo {fit.center:.1f}°). {info['label']}용 halo 탐색 구간·상 라이브러리는 "
+                                   "아직 준비되지 않아 판정·결정립 크기를 신뢰하기 어렵습니다.")
+    lines = phase_lines(library, lam, float(x[0]), float(x[-1]), system)
     match_peaks(peaks, lines, settings, det.min_height, lam)
     for p in peaks:
         if p.contaminant:
@@ -104,5 +115,6 @@ def analyze(pattern: Pattern, settings: dict | None = None, library: list[dict] 
         result.warnings.append(f"모델 적합도 낮음(χ²red {fit.chi2_red:.2f}) — 그래프를 확인하세요.")
     if pattern.counting_time_s is None:
         result.warnings.append("계수시간 정보가 없습니다 — 강도를 counts로 가정했습니다.")
+    result.nano = classify_nano(result, settings)
     result.sentence = build_sentence(result)
     return result

@@ -11,7 +11,7 @@ from xrdcheck.report.figure import VERDICT_COLORS
 
 KEY_ROLE = Qt.UserRole
 SORT_ROLE = Qt.UserRole + 1
-COLUMNS = ["시료명", "판정", "halo 2θ", "FWHM", "z최대", "경고"]
+COLUMNS = ["시료명", "판정", "나노결정", "halo 2θ", "FWHM", "z최대", "경고"]
 VERDICT_ORDER = {"비정질": 0, "결정상 의심": 1, "결정상 검출": 2, "판정 불가": 3}
 _ICONS: dict[str, QIcon] = {}
 
@@ -38,6 +38,17 @@ class SortItem(QTableWidgetItem):
         if a is None or b is None:
             return b is None and a is not None
         return a < b
+
+
+def _nano_short(r: AnalysisResult) -> str:
+    """목록용 짧은 표기: 후보 / 의심 / 아님 / 빈칸."""
+    if not r.nano:
+        return ""
+    s = r.nano.get("size")
+    if s and s["size_nm"] is not None:
+        prefix = {"분해능 한계(이상)": ">", "폭 상한(이하)": "≤"}.get(s["limit"], "")
+        return f"후보 {prefix}{s['size_nm']:.0f} nm"
+    return {"나노결정 후보": "후보", "나노결정 의심": "의심"}.get(r.nano["label"], "아님")
 
 
 def result_key(r: AnalysisResult) -> str:
@@ -79,6 +90,7 @@ class ResultTable(QTableWidget):
         cells = [
             (r.pattern.sample_name, r.pattern.sample_name.lower()),
             (v, VERDICT_ORDER.get(v, 9)),
+            (_nano_short(r), _nano_short(r)),
             (f"{h.center:.2f}" if h else "-", h.center if h else None),
             (f"{h.fwhm:.2f}" if h else "-", h.fwhm if h else None),
             (f"{r.z_max:.1f}" if r.z_max is not None else "-", r.z_max),
@@ -87,7 +99,7 @@ class ResultTable(QTableWidget):
         for col, (text, sort) in enumerate(cells):
             item = SortItem(text)
             item.setData(SORT_ROLE, sort)
-            if col > 1:
+            if col > 2:
                 item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
             self.setItem(row, col, item)
         self.item(row, 0).setData(KEY_ROLE, key)
@@ -95,9 +107,11 @@ class ResultTable(QTableWidget):
         badge = self.item(row, 1)
         badge.setIcon(verdict_icon(v))
         badge.setBackground(QBrush(QColor(VERDICT_COLORS.get(v, "#616161")).lighter(185)))
+        if r.nano:
+            self.item(row, 2).setToolTip(r.nano["label"])
         if r.warnings:
-            self.item(row, 5).setToolTip("\n".join(f"• {w}" for w in r.warnings))
-            self.item(row, 5).setForeground(QBrush(QColor("#ef6c00")))
+            self.item(row, 6).setToolTip("\n".join(f"• {w}" for w in r.warnings))
+            self.item(row, 6).setForeground(QBrush(QColor("#ef6c00")))
         self.setSortingEnabled(True)
         return self._row_of(key)
 

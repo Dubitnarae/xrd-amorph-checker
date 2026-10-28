@@ -34,8 +34,26 @@ def build_sentence(r: AnalysisResult) -> str:
     if r.verdict.name == "AMORPHOUS":
         return (f"{v} — {halo} 협폭 결정 피크 미검출(z최대 {r.z_max:.1f}, 우연확률 {format_p(r.p_chance)}).{dl}")
     peaks = ", ".join(_peak_text(p) for p in counted)
+    nano = _nano_text(r)
     if r.verdict.name == "DETECTED":
         low = any(p.match_confidence == "낮음" for p in counted)
         tail = " 상 매칭 신뢰도 낮음(다른 강한 선 미검출) — 그래프 확인." if low else ""
-        return f"{v} — 협폭 피크 {len(counted)}개: {peaks}. {halo}{tail}"
-    return f"{v} — 협폭 피크 후보 {len(counted)}개: {peaks}. 그래프로 확인 필요. {halo}{dl}"
+        return f"{v} — 협폭 피크 {len(counted)}개: {peaks}. {halo}{nano}{tail}"
+    return f"{v} — 협폭 피크 후보 {len(counted)}개: {peaks}. 그래프로 확인 필요. {halo}{nano}{dl}"
+
+
+def _nano_text(r: AnalysisResult) -> str:
+    n = r.nano
+    if not n:
+        return ""
+    lo, hi = n["window"]
+    if n["halo_peaks"]:
+        where = ", ".join(f"{t:.2f}°" for t in n["halo_peaks"])
+        size = ""
+        if n.get("size"):
+            from xrdcheck.analysis.nano import format_size
+
+            s = n["size"]
+            size = f" 결정립 크기 D ≈ {format_size(s)}(Scherrer, {s['label']} {s['two_theta']:.2f}°)."
+        return f" {n['label']}(주 halo {lo:.1f}–{hi:.1f}° 위 피크 {where}).{size}"
+    return f" {n['label']}(주 halo {lo:.1f}–{hi:.1f}°)."

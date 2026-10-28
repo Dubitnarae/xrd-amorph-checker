@@ -31,11 +31,26 @@ def _hkl_n(hkl: str) -> int:
     return sum(int(c) ** 2 for c in hkl)
 
 
-def phase_lines(library: list[dict], wavelength_A: float, x_min: float, x_max: float) -> list[dict]:
+def detect_system(halo_center: float, settings: dict) -> str | None:
+    """halo 중심으로 합금계 키("Fe", "Al" …)를 고른다. 어느 범위에도 없으면 None."""
+    for key, sys_ in settings.get("alloy_systems", {}).items():
+        if key.startswith("_"):
+            continue
+        lo, hi = sys_["halo_center_range_deg"]
+        if lo <= halo_center < hi:
+            return key
+    return None
+
+
+def phase_lines(library: list[dict], wavelength_A: float, x_min: float, x_max: float,
+                system: str | None = None) -> list[dict]:
     """라이브러리를 파일 파장으로 2θ로 바꾸고, 스캔 범위에 걸치는 선만 돌려준다.
-    범위 상은 two_theta_min–two_theta_max 구간을 갖는다(고정 d값이면 같은 값)."""
+    범위 상은 two_theta_min–two_theta_max 구간을 갖는다(고정 d값이면 같은 값).
+    system이 주어지면 그 합금계에 해당하는 상만(상에 systems가 없으면 모든 합금계에 해당)."""
     out = []
     for ph in library:
+        if system and system not in ph.get("systems", [system]):
+            continue
         a_range = ph.get("cubic_a_range_A")
         for ln in ph["lines"]:
             if a_range:

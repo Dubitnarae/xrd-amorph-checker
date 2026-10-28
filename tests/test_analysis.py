@@ -269,3 +269,104 @@ def test_library_validation_accepts_range_phase():
     assert validate_library_text(default_library_text()) is None
     bad = '{"phases": [{"name": "X", "cubic_a_range_A": [3, 2], "lines": [{"hkl": "110", "rel": 100}]}]}'
     assert "cubic_a_range_A" in validate_library_text(bad)
+
+
+# ---------------------------------------------------------------- 나노결정 기준: 주 halo 위 피크(필요조건)
+
+
+def test_nano_candidate_needs_peak_on_main_halo():
+    p = _synthetic()
+    for n, h in ((2, 60), (4, 15), (6, 20)):
+        p.counts = p.counts + gaussian(p.two_theta, h, _bcc_tt(2.840, n), 0.3)
+    r = analyze(p)
+    assert r.verdict == Verdict.DETECTED
+    assert r.nano["label"] == "나노결정 후보"
+    lo, hi = r.nano["window"]
+    assert lo < 45.1 < hi and any(abs(t - 45.1) < 0.2 for t in r.nano["halo_peaks"])
+    assert "나노결정 후보" in r.sentence
+
+
+def test_crystal_peaks_off_halo_are_not_nano():
+    """주 halo 밖(65°대·82°대)에만 결정 피크가 있으면 결정상이어도 나노결정 아님."""
+    p = _synthetic()
+    p.counts = p.counts + gaussian(p.two_theta, 40, 65.02, 0.15) + gaussian(p.two_theta, 45, 82.33, 0.15)
+    r = analyze(p)
+    assert r.verdict == Verdict.DETECTED
+    assert r.nano["label"].startswith("나노결정 아님")
+
+
+def test_amorphous_has_no_nano_label(sample_result):
+    assert sample_result.nano is None
+
+
+# ---------------------------------------------------------------- Scherrer 결정립 크기
+
+
+def _nano_pattern(size_nm, height=80, a=2.840, k=0.9):
+    """크기를 아는 α-Fe(Si) 나노결정(Kα1+Kα2 쌍, 가우시안)을 합성 halo에 넣는다."""
+    from xrdcheck.analysis.nano import instrument_fwhm
+
+    p = _synthetic()
+    s = load_settings()
+    lam = p.kalpha1_A
+    for n, rel in ((2, 1.0), (4, 0.2), (6, 0.3)):
+        tt = _bcc_tt(a, n)
+        beta = np.degrees(k * lam / (size_nm * 10 * np.cos(np.radians(tt / 2))))
+        fw = float(np.hypot(beta, instrument_fwhm(tt, s)))
+        dtt = kalpha2_offset_deg(tt, lam, p.kalpha2_A)
+        p.counts = p.counts + gaussian(p.two_theta, height * rel, tt, fw) + gaussian(p.two_theta, 0.5 * height * rel, tt + dtt, fw)
+    return p
+
+
+@pytest.mark.parametrize("size_nm, height", [(8.0, 160), (10.0, 80), (15.0, 80), (30.0, 80)])
+def test_scherrer_recovers_known_size(size_nm, height):
+    """알려진 크기를 되찾는다. 8 nm(FWHM ≈ 1.1°)는 피크가 강할 때만 halo와 구분된다 — 6 nm 이하는 이 방법의 한계."""
+    r = analyze(_nano_pattern(size_nm, height=height))
+    assert r.nano["label"] == "나노결정 후보"
+    s = r.nano["size"]
+    assert s["limit"] == ""
+    assert s["size_nm"] == pytest.approx(size_nm, rel=0.15)
+    assert s["size_err_nm"] is not None and s["size_err_nm"] < 0.5 * size_nm
+    assert "결정립 크기 D ≈" in r.sentence and "nm" in r.sentence
+
+
+def test_scherrer_resolution_limit():
+    """측정 폭이 기기 폭에 가까우면 '> ○ nm'로만 표시."""
+    from xrdcheck.analysis.nano import format_size, scherrer
+
+    s = load_settings()
+    pk = Peak(45.1, 20, 100, 0.105, 10, "검출", matches=["α-Fe(Si)(110)"])
+    out = scherrer(pk, 1.540598, s)
+    assert out["limit"] == "분해능 한계(이상)" and format_size(out).startswith("> ")
+
+
+def test_scherrer_value_by_hand():
+    """D = Kλ/(β cosθ): 2θ = 45°, B = 0.6°, b = 0.10° → β = √(0.36 − 0.01)."""
+    import math
+
+    from xrdcheck.analysis.nano import scherrer
+
+    s = load_settings()
+    s["nanocrystal"]["scherrer_instrument_fwhm_deg"] = [[20, 0.10], [90, 0.10]]
+    out = scherrer(Peak(45.0, 20, 100, 0.6, 10, "검출"), 1.540598, s)
+    beta = math.radians(math.sqrt(0.6**2 - 0.1**2))
+    assert out["size_nm"] == pytest.approx(0.9 * 1.540598 / (beta * math.cos(math.radians(22.5))) / 10, rel=1e-9)
+
+
+def test_alloy_system_limits_phases():
+    """Fe계 시료(halo 44.8°)에서는 38.5° 피크를 Al(111)로 매칭하지 않는다."""
+    p = _synthetic()
+    p.counts = p.counts + gaussian(p.two_theta, 40, 38.47, 0.15)
+    r = analyze(p)
+    assert r.alloy_system == "Fe계"
+    assert not any(m.startswith("Al(") for pk in r.peaks for m in pk.matches)
+
+
+def test_al_system_detected_and_warned():
+    x = np.linspace(20, 90, 2666)
+    mu = 15 + 45 * np.exp(-(x - 20) / 8) + gaussian(x, 55, 38.5, 6.0) + gaussian(x, 10, 70, 10)
+    y = np.random.default_rng(3).poisson(mu).astype(float)
+    r = analyze(Pattern(two_theta=x, counts=y, source_path=Path("al.xrdml"), file_format="xrdml",
+                        sample_name="Al", counting_time_s=78.54))
+    assert r.alloy_system == "Al계"
+    assert any("Al계" in w and "준비되지 않아" in w for w in r.warnings)

@@ -103,11 +103,6 @@ def refine_peak(x, resid, y, mu, i: int, z_i: float, det: NarrowDetector, double
     """잔차에 국소 Kα1+Kα2 pseudo-Voigt 쌍 + 상수를 피팅해 Kα1의 위치·높이·FWHM·면적을 구한다."""
     rs = settings["peak_refine"]
     level = "검출" if z_i >= settings["z_detect"] else "의심"
-    half = max(rs["window_deg"], 5 * det.fwhm)
-    w = (x > x[i] - half) & (x < x[i] + doublet.offset(x[i]) + half)
-    xr, r, sig = x[w], resid[w], np.sqrt(np.maximum(y[w], 1))
-    near = np.abs(xr - x[i]) <= det.fwhm
-    h0 = max(float(r[near].max()), 1.0)
     dc = rs["center_shift_max_deg"]
     fw_lo, fw_hi = rs["fwhm_range_deg"]
     off = 10 * float(np.sqrt(mu[i])) + 10
@@ -116,13 +111,31 @@ def refine_peak(x, resid, y, mu, i: int, z_i: float, det: NarrowDetector, double
         return doublet(xx, h, c, fw, eta) + o
 
     try:
-        p0 = [h0, x[i], min(max(det.fwhm, fw_lo), fw_hi), 0.5, 0.0]
-        lb = [0, x[i] - dc, fw_lo, 0, -off]
-        ub = [max(10 * h0, 10), x[i] + dc, fw_hi, 1, off]
-        p, _ = curve_fit(f, xr, r, p0=p0, bounds=(lb, ub), sigma=sig, maxfev=5000)
+        # 넓은(나노결정) 피크는 꼬리가 잘리지 않도록 구간을 피크 폭의 ±4배까지 넓혀 한 번 더 피팅
+        half = max(rs["window_deg"], 5 * det.fwhm)
+        p0 = None
+        for _ in range(2):
+            w = (x > x[i] - half) & (x < x[i] + doublet.offset(x[i]) + half)
+            xr, r, sig = x[w], resid[w], np.sqrt(np.maximum(y[w], 1))
+            if p0 is None:
+                near = np.abs(xr - x[i]) <= det.fwhm
+                h0 = max(float(r[near].max()), 1.0)
+                p0 = [h0, x[i], min(max(det.fwhm, fw_lo), fw_hi), 0.5, 0.0]
+            lb = [0, x[i] - dc, fw_lo, 0, -off]
+            ub = [max(10 * h0, 10), x[i] + dc, fw_hi, 1, off]
+            p, cov = curve_fit(f, xr, r, p0=np.clip(p0, np.add(lb, 1e-9), np.subtract(ub, 1e-9)),
+                               bounds=(lb, ub), sigma=sig, maxfev=5000)
+            need = 4 * float(p[2])
+            if need <= half * 1.05:
+                break
+            half, p0 = min(need, 6.0), list(p)
         h, c, fw, eta, _ = map(float, p)
-        return Peak(two_theta=c, z=z_i, height=h, fwhm=fw, area=pseudo_voigt_area(h, fw, eta), level=level,
-                    eta=eta)
+        fw_err = float(np.sqrt(cov[2, 2])) if np.isfinite(cov[2, 2]) and cov[2, 2] >= 0 else None
+        pk = Peak(two_theta=c, z=z_i, height=h, fwhm=fw, area=pseudo_voigt_area(h, fw, eta), level=level,
+                  eta=eta, fwhm_err=fw_err)
+        if fw >= fw_hi * 0.999:
+            pk.notes.append(f"FWHM이 피팅 상한({fw_hi:g}°)에 닿음 — 실제 폭은 더 넓을 수 있음")
+        return pk
     except (RuntimeError, ValueError):
         # 피팅이 안 되면 필터 응답으로 높이를 추정(가우시안, 기기 FWHM 가정)
         h = det.min_height(float(x[i]), z_i) or h0
