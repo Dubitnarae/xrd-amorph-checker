@@ -1,0 +1,14 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+*.egg-info/
+
+# 빌드·출력
+build/
+dist/
+out/
+
+# 실측 데이터 — 공개 저장소로 올릴 경우 아래 주석을 해제
+# samples/
