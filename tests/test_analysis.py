@@ -327,7 +327,8 @@ def test_scherrer_recovers_known_size(size_nm, height):
     assert s["limit"] == ""
     assert s["size_nm"] == pytest.approx(size_nm, rel=0.15)
     assert s["size_err_nm"] is not None and s["size_err_nm"] < 0.5 * size_nm
-    assert "결정립 크기 D ≈" in r.sentence and "nm" in r.sentence
+    assert "결정립 크기 D = " in r.sentence and "nm" in r.sentence
+    _assert_font_has(r.sentence)
 
 
 def test_scherrer_resolution_limit():
@@ -370,3 +371,25 @@ def test_al_system_detected_and_warned():
                         sample_name="Al", counting_time_s=78.54))
     assert r.alloy_system == "Al계"
     assert any("Al계" in w and "준비되지 않아" in w for w in r.warnings)
+
+
+def _assert_font_has(text: str) -> None:
+    """그래프에 찍히는 문장의 모든 글자가 맑은 고딕에 있어야 한다(없으면 그래프에서 네모로 보임)."""
+    font = Path(r"C:\Windows\Fonts\malgun.ttf")
+    if not font.exists():
+        pytest.skip("맑은 고딕 없음")
+    from matplotlib import ft2font
+
+    cmap = ft2font.FT2Font(str(font)).get_charmap()
+    missing = sorted({c for c in text if ord(c) > 127 and ord(c) not in cmap})
+    assert not missing, f"맑은 고딕에 없는 글자: {missing}"
+
+
+def test_sentences_render_in_malgun_gothic(sample_result):
+    """결과 문장(그래프 제목에 들어감)에 맑은 고딕에 없는 글자가 없는지 — 판정 종류별로 확인."""
+    _assert_font_has(sample_result.sentence)
+    _assert_font_has(analyze(_nano_pattern(12.0)).sentence)
+    p = _synthetic()
+    p.counts = p.counts + gaussian(p.two_theta, 150, 65.5, 0.2)
+    _assert_font_has(analyze(p).sentence)
+    _assert_font_has(analyze(_synthetic(x0=55, x1=90)).sentence)

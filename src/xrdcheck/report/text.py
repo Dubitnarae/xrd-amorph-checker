@@ -54,6 +54,7 @@ def _nano_text(r: AnalysisResult) -> str:
             from xrdcheck.analysis.nano import format_size
 
             s = n["size"]
-            size = f" 결정립 크기 D ≈ {format_size(s)}(Scherrer, {s['label']} {s['two_theta']:.2f}°)."
+            fs = format_size(s)  # 그래프 글꼴(맑은 고딕)에 없는 '≈'는 쓰지 않는다
+            size = f" 결정립 크기 D {'' if fs[0] in '>≤' else '= '}{fs}(Scherrer, {s['label']} {s['two_theta']:.2f}°)."
         return f" {n['label']}(주 halo {lo:.1f}–{hi:.1f}° 위 피크 {where}).{size}"
     return f" {n['label']}(주 halo {lo:.1f}–{hi:.1f}°)."
