@@ -12,7 +12,8 @@ from matplotlib.figure import Figure
 from xrdcheck.model import AnalysisResult
 
 FONT = "Malgun Gothic"
-VERDICT_COLORS = {"비정질": "#2e7d32", "결정상 의심": "#ef6c00", "결정상 검출": "#c62828", "판정 불가": "#616161"}
+VERDICT_COLORS = {"비정질": "#2e7d32", "결정상 의심": "#ef6c00", "결정상 검출": "#c62828", "나노결정상 후보": "#6a1b9a",
+                  "판정 불가": "#616161"}
 COMPONENT_STYLES = {"배경": ("#8d6e63", ":"), "주 halo": ("#1565c0", "--"), "제2 halo": ("#6a1b9a", "--")}
 
 

@@ -55,6 +55,7 @@ class Verdict(str, Enum):
     AMORPHOUS = "비정질"
     SUSPECT = "결정상 의심"
     DETECTED = "결정상 검출"
+    NANO = "나노결정상 후보"  # 결정상 검출 중 주 halo 위 피크의 Scherrer 크기가 나노결정 범위(analysis/nano.py)
     UNDETERMINED = "판정 불가"
 
 

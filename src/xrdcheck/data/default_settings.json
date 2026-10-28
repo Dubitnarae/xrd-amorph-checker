@@ -51,12 +51,14 @@
     "Al": {"label": "Al계", "halo_center_range_deg": [33.0, 41.0], "ready": false}
   },
   "nanocrystal": {
-    "_comment": "나노결정 필요조건: 주 halo 위(중심 ± 비율×FWHM) 결정 피크. 사용자 기준 2026-10-28",
+    "_comment": "나노결정 필요조건: 주 halo 위(중심 ± 비율×FWHM) 결정 피크. 그 피크의 Scherrer 크기가 size_range_nm 안이면 판정 '나노결정상 후보'. 사용자 기준 2026-10-28",
     "halo_window_fwhm_fraction": 0.5,
+    "size_range_nm": [10, 90],
+    "_scherrer_max_comment": "Scherrer 적용 상한. 측정 폭이 이 크기에 해당하는 폭보다 좁은 피크는 크기를 내지 않고 '> 100 nm'로 표시",
+    "scherrer_max_nm": 100,
     "scherrer_k": 0.9,
     "_scherrer_comment": "기기 폭 b(2θ): 표준시료 미측정 — 실측 1,020개 중 강한 결정 피크(z ≥ 30) FWHM 하위 1–5%로 추정(2026-10-28). 순수 폭 β = √(B² − b²)",
     "scherrer_instrument_fwhm_deg": [[44.7, 0.10], [65.0, 0.11], [82.5, 0.13]],
-    "scherrer_min_broadening_ratio": 1.2,
     "scherrer_instrument_measured": false
   },
   "broad_component": {

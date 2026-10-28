@@ -10,5 +10,20 @@ build/
 dist/
 out/
 
-# 실측 데이터 — 공개 저장소로 올릴 경우 아래 주석을 해제
-# samples/
+# ── 비공개(저장소에 올리지 않음) — 다른 PC로는 NAS·USB로 옮긴다(CLAUDE.md '다른 PC에서 이어 하기') ──
+# 작업 지시·계획·개발 기록
+CLAUDE.md
+PLAN.md
+docs/PLAN.md
+docs/DEVLOG.md
+docs/CALIBRATION.md
+명령대기.txt
+# 실측 데이터와 실측 기반 기대값·그림
+samples/
+tests/expected/
+tests/private/
+docs/img/
+*.xrdml
+*.rasx
+*.RTF
+*.rtf

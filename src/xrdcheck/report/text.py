@@ -35,7 +35,7 @@ def build_sentence(r: AnalysisResult) -> str:
         return (f"{v} — {halo} 협폭 결정 피크 미검출(z최대 {r.z_max:.1f}, 우연확률 {format_p(r.p_chance)}).{dl}")
     peaks = ", ".join(_peak_text(p) for p in counted)
     nano = _nano_text(r)
-    if r.verdict.name == "DETECTED":
+    if r.verdict.name in ("DETECTED", "NANO"):
         low = any(p.match_confidence == "낮음" for p in counted)
         tail = " 상 매칭 신뢰도 낮음(다른 강한 선 미검출) — 그래프 확인." if low else ""
         return f"{v} — 협폭 피크 {len(counted)}개: {peaks}. {halo}{nano}{tail}"
@@ -55,6 +55,12 @@ def _nano_text(r: AnalysisResult) -> str:
 
             s = n["size"]
             fs = format_size(s)  # 그래프 글꼴(맑은 고딕)에 없는 '≈'는 쓰지 않는다
-            size = f" 결정립 크기 D {'' if fs[0] in '>≤' else '= '}{fs}(Scherrer, {s['label']} {s['two_theta']:.2f}°)."
-        return f" {n['label']}(주 halo {lo:.1f}–{hi:.1f}° 위 피크 {where}).{size}"
+            if s["size_nm"] is None:
+                size = f" 피크 폭이 기기 폭에 가까워 결정립 크기 {fs} — Scherrer 적용 범위 밖이라 크기를 내지 않음."
+            else:
+                size = f" 결정립 크기 D {'' if fs[0] in '>≤' else '= '}{fs}(Scherrer, {s['label']} {s['two_theta']:.2f}°)."
+            if n.get("xc") is not None:
+                size += f" 결정 분율 Xc = {n['xc'] * 100:.1f}%(참고)."
+        head = "" if r.verdict.name == "NANO" else n["label"]  # 판정이 이미 '나노결정상 후보'면 되풀이하지 않음
+        return f" {head}(주 halo {lo:.1f}–{hi:.1f}° 위 피크 {where}).{size}" if head else             f" 주 halo {lo:.1f}–{hi:.1f}° 위 피크 {where}.{size}"
     return f" {n['label']}(주 halo {lo:.1f}–{hi:.1f}°)."

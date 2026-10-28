@@ -387,6 +387,7 @@ class MainWindow(QMainWindow):
         QMessageBox.about(self, "정보",
                           f"<b>{APP_TITLE}</b> v{__version__}<br><br>"
                           "비정질 halo를 피팅하고 결정 피크를 통계적으로 찾아<br>"
-                          "비정질 / 결정상 의심 / 결정상 검출 / 판정 불가로 판정합니다.<br><br>"
+                          "비정질 / 결정상 의심 / 결정상 검출 / 나노결정상 후보 / 판정 불가로 판정합니다.<br>"
+                          "나노결정상 후보: 주 halo 위 결정 피크의 Scherrer 크기가 10–90 nm인 경우<br><br>"
                           "판정은 보조 수단입니다. 근거(그래프·수치·검출한계)를 확인하고 최종 판단은 사람이 합니다."
                           f"<br><br>사용자 설정 폴더: {self.store.dir}")

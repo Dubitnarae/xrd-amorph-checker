@@ -104,7 +104,7 @@ def test_synthetic_with_peaks_detected():
     p = _synthetic()
     p.counts = p.counts + gaussian(p.two_theta, 60, 44.672, 0.15) + gaussian(p.two_theta, 30, 65.02, 0.15)
     r = analyze(p)
-    assert r.verdict == Verdict.DETECTED
+    assert r.verdict == Verdict.NANO  # 주 halo 위 FWHM 0.15° → Scherrer 약 77 nm(나노결정 범위 안)
     labels = {m for pk in r.peaks for m in pk.matches}
     assert {"α-Fe(110)", "α-Fe(200)"} <= labels
     big = max(r.peaks, key=lambda pk: pk.height)
@@ -279,11 +279,12 @@ def test_nano_candidate_needs_peak_on_main_halo():
     for n, h in ((2, 60), (4, 15), (6, 20)):
         p.counts = p.counts + gaussian(p.two_theta, h, _bcc_tt(2.840, n), 0.3)
     r = analyze(p)
-    assert r.verdict == Verdict.DETECTED
-    assert r.nano["label"] == "나노결정 후보"
+    assert r.verdict == Verdict.NANO
+    assert r.nano["label"] == "나노결정상 후보" and r.nano["in_range"]
     lo, hi = r.nano["window"]
     assert lo < 45.1 < hi and any(abs(t - 45.1) < 0.2 for t in r.nano["halo_peaks"])
-    assert "나노결정 후보" in r.sentence
+    assert r.sentence.startswith("나노결정상 후보 — ")
+    assert 0 < r.nano["xc"] < 0.5
 
 
 def test_crystal_peaks_off_halo_are_not_nano():
@@ -318,11 +319,16 @@ def _nano_pattern(size_nm, height=80, a=2.840, k=0.9):
     return p
 
 
-@pytest.mark.parametrize("size_nm, height", [(8.0, 160), (10.0, 80), (15.0, 80), (30.0, 80)])
+@pytest.mark.parametrize("size_nm, height", [(8.0, 160), (10.5, 80), (15.0, 80), (30.0, 80), (60.0, 300)])
 def test_scherrer_recovers_known_size(size_nm, height):
-    """알려진 크기를 되찾는다. 8 nm(FWHM ≈ 1.1°)는 피크가 강할 때만 halo와 구분된다 — 6 nm 이하는 이 방법의 한계."""
+    """알려진 크기를 되찾는다. 8 nm(FWHM ≈ 1.1°)는 피크가 강할 때만 halo와 구분된다 — 6 nm 이하는 이 방법의 한계.
+    10–90 nm면 판정이 '나노결정상 후보', 범위 밖(8 nm)이면 '결정상 검출' 그대로.
+    40 nm 이상은 폭이 기기 폭에 가까워져 약한 피크에서 오차가 커진다(60 nm·높이 80 → 84 ± 25 nm) — 강한 피크로 시험."""
     r = analyze(_nano_pattern(size_nm, height=height))
-    assert r.nano["label"] == "나노결정 후보"
+    if 10 <= size_nm <= 90:
+        assert r.verdict == Verdict.NANO and r.nano["label"] == "나노결정상 후보"
+    else:
+        assert r.verdict == Verdict.DETECTED and r.nano["label"] == "나노결정 범위 밖(10 nm 미만)"
     s = r.nano["size"]
     assert s["limit"] == ""
     assert s["size_nm"] == pytest.approx(size_nm, rel=0.15)
@@ -331,14 +337,58 @@ def test_scherrer_recovers_known_size(size_nm, height):
     _assert_font_has(r.sentence)
 
 
-def test_scherrer_resolution_limit():
-    """측정 폭이 기기 폭에 가까우면 '> ○ nm'로만 표시."""
-    from xrdcheck.analysis.nano import format_size, scherrer
+def test_scherrer_over_100nm_is_filtered():
+    """측정 폭이 100 nm에 해당하는 폭보다 좁으면 크기를 내지 않고 '> 100 nm'로만 표시."""
+    from xrdcheck.analysis.nano import fwhm_for_size, format_size, scherrer
 
     s = load_settings()
-    pk = Peak(45.1, 20, 100, 0.105, 10, "검출", matches=["α-Fe(Si)(110)"])
-    out = scherrer(pk, 1.540598, s)
-    assert out["limit"] == "분해능 한계(이상)" and format_size(out).startswith("> ")
+    b100 = fwhm_for_size(100, 45.1, 1.540598, s)
+    assert 0.12 < b100 < 0.15
+    out = scherrer(Peak(45.1, 20, 100, b100 - 0.005, 10, "검출", matches=["α-Fe(Si)(110)"]), 1.540598, s)
+    assert out["size_nm"] is None and format_size(out) == "> 100 nm"
+    out = scherrer(Peak(45.1, 20, 100, b100 + 0.005, 10, "검출", matches=["α-Fe(Si)(110)"]), 1.540598, s)
+    assert out["size_nm"] is not None and 85 < out["size_nm"] < 100
+
+
+@pytest.mark.parametrize("fwhm, verdict, label, short", [
+    (0.08, Verdict.DETECTED, "Scherrer 적용 범위 밖(100 nm 초과)", "> 100 nm"),  # 날카로움 → 걸러짐
+    (0.30, Verdict.NANO, "나노결정상 후보", None),                               # 약 30 nm
+    (0.95, Verdict.DETECTED, "나노결정 범위 밖(10 nm 미만)", None),              # 약 9 nm
+])
+def test_nano_verdict_by_size(fwhm, verdict, label, short):
+    """주 halo 위 피크의 Scherrer 크기로 판정: 10–90 nm만 '나노결정상 후보', 목록 표기는 'X nm'(접두어 없음)."""
+    from xrdcheck.analysis.nano import size_short
+
+    p = _synthetic()
+    for n, h in ((2, 120), (4, 25), (6, 35)):
+        p.counts = p.counts + gaussian(p.two_theta, h, _bcc_tt(2.840, n), fwhm)
+    r = analyze(p)
+    assert r.verdict == verdict, r.sentence
+    assert r.nano["label"] == label
+    txt = size_short(r)
+    assert not txt.startswith("후보")
+    if short:
+        assert txt == short
+    else:
+        assert txt == f"{r.nano['size']['size_nm']:.0f} nm"
+    _assert_font_has(r.sentence)
+
+
+def test_nano_size_out_of_range_large():
+    """90–100 nm는 Scherrer로 크기를 내지만 나노결정 범위 밖 → 결정상 검출."""
+    from xrdcheck.analysis.nano import fwhm_for_size
+
+    s = load_settings()
+    p = _synthetic()
+    tt = _bcc_tt(2.840, 2)
+    fw = fwhm_for_size(95, tt, p.kalpha1_A, s)
+    for n, h in ((2, 300), (4, 60), (6, 80)):
+        t = _bcc_tt(2.840, n)
+        dtt = kalpha2_offset_deg(t, p.kalpha1_A, p.kalpha2_A)
+        p.counts = p.counts + gaussian(p.two_theta, h, t, fw) + gaussian(p.two_theta, h / 2, t + dtt, fw)
+    r = analyze(p)
+    assert r.verdict == Verdict.DETECTED
+    assert r.nano["label"] in ("나노결정 범위 밖(90 nm 초과)", "Scherrer 적용 범위 밖(100 nm 초과)")
 
 
 def test_scherrer_value_by_hand():

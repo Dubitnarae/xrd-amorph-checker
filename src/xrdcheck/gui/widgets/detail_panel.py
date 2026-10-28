@@ -53,6 +53,10 @@ def result_html(r: AnalysisResult) -> str:
             out.append(_row(f"D — {s['label']} {s['two_theta']:.2f}°", format_size(s)))
             out.append(_row("측정 FWHM / 기기 FWHM", f"{s['fwhm_obs']:.3f}° / {s['fwhm_inst']:.3f}°"))
             out += [_row(f"D — {o['label']} {o['two_theta']:.2f}°", format_size(o)) for o in r.nano["other_sizes"]]
+            if r.nano.get("over_peaks"):
+                out.append(_row("Scherrer 적용 범위 밖(크기 안 냄)", ", ".join(f"{t:.2f}°" for t in r.nano["over_peaks"])))
+            if r.nano.get("xc") is not None:
+                out.append(_row("결정 분율 Xc(참고)", f"{r.nano['xc'] * 100:.1f}%"))
             out.append("</table>")
 
     if h is not None:

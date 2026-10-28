@@ -85,7 +85,7 @@ def main(argv=None) -> int:
     tab = defaultdict(Counter)
     for r in uniq:
         tab[(series(r["file"]), "열처리" if heat_treated(r) else "")][r["verdict"]] += 1
-    verdicts = ["비정질", "결정상 의심", "결정상 검출", "판정 불가"]
+    verdicts = ["비정질", "결정상 의심", "결정상 검출", "나노결정상 후보", "판정 불가"]
     say(f"  {'시리즈':8s}{'':6s}" + "".join(f"{v:>10s}" for v in verdicts) + f"{'합계':>8s}")
     for key in sorted(tab):
         c = tab[key]

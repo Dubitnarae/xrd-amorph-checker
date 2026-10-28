@@ -24,7 +24,8 @@ def _cases():
     if not path.exists():
         return []
     inj = json.loads(path.read_text(encoding="utf-8"))["injection_tests"]
-    return [pytest.param(inj["fwhm_deg"], c, id=" + ".join(f"{a}:{h}" for a, h in c["inject"]))
+    return [pytest.param(c.get("fwhm_deg", inj["fwhm_deg"]), c,
+                         id=" + ".join(f"{a}:{h}" for a, h in c["inject"]) + f" w{c.get('fwhm_deg', inj['fwhm_deg'])}")
             for c in inj["cases"]]
 
 

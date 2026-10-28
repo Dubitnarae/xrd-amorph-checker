@@ -14,7 +14,8 @@ from xrdcheck.model import AnalysisResult
 from xrdcheck.report.text import format_p
 from xrdcheck.settings import flatten
 
-VERDICT_FILL = {"비정질": "C8E6C9", "결정상 의심": "FFE0B2", "결정상 검출": "FFCDD2", "판정 불가": "E0E0E0"}
+VERDICT_FILL = {"비정질": "C8E6C9", "결정상 의심": "FFE0B2", "결정상 검출": "FFCDD2", "나노결정상 후보": "E1BEE7",
+                "판정 불가": "E0E0E0"}
 HEADER_FILL = PatternFill("solid", fgColor="ECEFF1")
 
 
@@ -41,6 +42,7 @@ def _size_cols(r: AnalysisResult) -> dict:
         "D 표기": format_size(s) if s else "",
         "D 근거 피크": f"{s['label']} {s['two_theta']:.2f}° (FWHM {s['fwhm_obs']:.3f}°, 기기 {s['fwhm_inst']:.3f}°)" if s else "",
         "다른 선 D": "; ".join(f"{o['label']} {format_size(o)}" for o in others),
+        "결정 분율 Xc(%, 참고)": _r((r.nano or {})["xc"] * 100, 1) if (r.nano or {}).get("xc") is not None else None,
     }
 
 

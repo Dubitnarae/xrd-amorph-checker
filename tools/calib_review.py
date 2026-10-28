@@ -59,7 +59,7 @@ def main(argv=None) -> int:
         "1_65도 단일 강한 피크": [r for r in uniq if r["verdict"] == "결정상 의심" and any(
             64.8 < fnum(p["two_theta"]) < 65.8 and fnum(p["z"]) >= 10 and p["confidence"] == "낮음" for p in counted(r))],
         "2_A·HA인데 결정상": [r for r in uniq if series(r["file"]) in ("A", "HA") and not heat_treated(r)
-                          and r["verdict"] == "결정상 검출"],
+                          and r["verdict"] in ("결정상 검출", "나노결정상 후보")],
         "3_X 열처리인데 비정질": [r for r in uniq if series(r["file"]) in ("X", "HX") and heat_treated(r)
                            and r["verdict"] == "비정질"],
         "4_석영 오염 감지": [r for r in uniq if (fnum(r["n_contam"]) or 0) > 0],

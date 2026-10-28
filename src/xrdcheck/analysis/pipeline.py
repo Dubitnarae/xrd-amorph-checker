@@ -116,5 +116,10 @@ def analyze(pattern: Pattern, settings: dict | None = None, library: list[dict] 
     if pattern.counting_time_s is None:
         result.warnings.append("계수시간 정보가 없습니다 — 강도를 counts로 가정했습니다.")
     result.nano = classify_nano(result, settings)
+    if result.nano and result.nano["in_range"]:
+        s = result.nano["size"]
+        lo, hi = settings["nanocrystal"]["size_range_nm"]
+        result.verdict = Verdict.NANO
+        result.reasons.append(f"주 halo 위 피크 {s['two_theta']:.2f}°의 Scherrer 크기 {s['size_nm']:.1f} nm가 나노결정 범위({lo:g}–{hi:g} nm) 안")
     result.sentence = build_sentence(result)
     return result

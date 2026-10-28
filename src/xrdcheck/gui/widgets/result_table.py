@@ -12,7 +12,7 @@ from xrdcheck.report.figure import VERDICT_COLORS
 KEY_ROLE = Qt.UserRole
 SORT_ROLE = Qt.UserRole + 1
 COLUMNS = ["시료명", "판정", "나노결정", "halo 2θ", "FWHM", "z최대", "경고"]
-VERDICT_ORDER = {"비정질": 0, "결정상 의심": 1, "결정상 검출": 2, "판정 불가": 3}
+VERDICT_ORDER = {"비정질": 0, "결정상 의심": 1, "나노결정상 후보": 2, "결정상 검출": 3, "판정 불가": 4}
 _ICONS: dict[str, QIcon] = {}
 
 
@@ -40,15 +40,16 @@ class SortItem(QTableWidgetItem):
         return a < b
 
 
+def _tint(color: str, keep: float = 0.22) -> QColor:
+    """배지 배경: 판정 색을 흰색과 섞어 연하게(글자가 잘 읽히도록)."""
+    c = QColor(color)
+    return QColor(*(round(255 - (255 - ch) * keep) for ch in (c.red(), c.green(), c.blue())))
+
+
 def _nano_short(r: AnalysisResult) -> str:
-    """목록용 짧은 표기: 후보 / 의심 / 아님 / 빈칸."""
-    if not r.nano:
-        return ""
-    s = r.nano.get("size")
-    if s and s["size_nm"] is not None:
-        prefix = {"분해능 한계(이상)": ">", "폭 상한(이하)": "≤"}.get(s["limit"], "")
-        return f"후보 {prefix}{s['size_nm']:.0f} nm"
-    return {"나노결정 후보": "후보", "나노결정 의심": "의심"}.get(r.nano["label"], "아님")
+    from xrdcheck.analysis.nano import size_short
+
+    return size_short(r)
 
 
 def result_key(r: AnalysisResult) -> str:
@@ -106,7 +107,7 @@ class ResultTable(QTableWidget):
         self.item(row, 0).setToolTip(str(r.pattern.source_path))
         badge = self.item(row, 1)
         badge.setIcon(verdict_icon(v))
-        badge.setBackground(QBrush(QColor(VERDICT_COLORS.get(v, "#616161")).lighter(185)))
+        badge.setBackground(QBrush(_tint(VERDICT_COLORS.get(v, "#616161"))))
         if r.nano:
             self.item(row, 2).setToolTip(r.nano["label"])
         if r.warnings:
