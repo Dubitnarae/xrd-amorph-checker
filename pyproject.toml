@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "xrdcheck"
-version = "0.1.0"
+version = "0.6.0"
 description = "XRD 비정질 판정 도우미 — halo 피팅과 결정 피크 검출"
 requires-python = ">=3.12"
 dependencies = [
@@ -17,12 +17,13 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest>=8", "pytest-qt>=4.4"]
+build = ["pyinstaller>=6.10"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
 
 [tool.setuptools.package-data]
-xrdcheck = ["data/*.json"]
+xrdcheck = ["data/*.json", "data/*.ico"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

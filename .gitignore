@@ -27,3 +27,6 @@ docs/img/
 *.rasx
 *.RTF
 *.rtf
+
+# PyInstaller가 만드는 spec(빌드 옵션은 build.ps1에 있음)
+*.spec

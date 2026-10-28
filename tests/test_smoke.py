@@ -6,8 +6,17 @@ from importlib import resources
 import xrdcheck
 
 
-def test_version():
-    assert xrdcheck.__version__ == "0.1.0"
+def test_version_matches_pyproject():
+    """버전은 __init__.py와 pyproject.toml 두 곳 — 둘이 같아야 한다(build.ps1도 확인)."""
+    import re
+    from pathlib import Path
+
+    toml = (Path(__file__).resolve().parents[1] / "pyproject.toml").read_text(encoding="utf-8")
+    assert re.search(r'^version = "(.+)"', toml, re.M).group(1) == xrdcheck.__version__
+
+
+def test_icon_is_packaged():
+    assert resources.files("xrdcheck").joinpath("data/icon.ico").is_file()
 
 
 def test_default_settings_is_valid_json():

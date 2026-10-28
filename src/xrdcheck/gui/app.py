@@ -16,7 +16,9 @@ def apply_matplotlib_rc() -> str | None:
 
 
 def run(paths: list[str] | None = None) -> int:
-    from PySide6.QtGui import QFont
+    from importlib import resources
+
+    from PySide6.QtGui import QFont, QIcon
     from PySide6.QtWidgets import QApplication
 
     from xrdcheck.gui.main_window import APP_TITLE, MainWindow
@@ -24,6 +26,9 @@ def run(paths: list[str] | None = None) -> int:
     app = QApplication.instance() or QApplication(sys.argv)
     app.setApplicationName(APP_TITLE)
     app.setFont(QFont("Malgun Gothic", 9))
+    icon = resources.files("xrdcheck").joinpath("data/icon.ico")
+    if icon.is_file():
+        app.setWindowIcon(QIcon(str(icon)))
     font_warning = apply_matplotlib_rc()
     w = MainWindow()
     w.show()
