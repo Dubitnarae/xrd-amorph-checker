@@ -1,3 +1,50 @@
 {
-  "_comment": "판정 기준값. 코드에 박지 않고 여기서 읽는다. 값을 바꾸면 DEVLOG에 이유를 남길 것."
+  "_comment": "판정 기준값. 코드에 박지 않고 여기서 읽는다. 값을 바꾸면 DEVLOG에 이유를 남길 것.",
+  "settings_version": 1,
+  "instrument_fwhm_deg": 0.15,
+  "z_detect": 5.0,
+  "z_suspect": 4.5,
+  "chi2_red_warn": 2.0,
+  "quality": {
+    "required_range_deg": [38.0, 52.0],
+    "min_max_counts": 20
+  },
+  "halo": {
+    "search_range_deg": [38.0, 52.0],
+    "center_bound_deg": 3.0,
+    "smooth_fwhm_deg": 0.5,
+    "baseline_range_deg": [55.0, 75.0],
+    "second_range_deg": [72.0, 88.0],
+    "second_min_scan_end_deg": 70.0
+  },
+  "detector": {
+    "dog_sigma_ratio": 4.0,
+    "edge_exclude_deg": 0.6,
+    "candidate_min_separation_deg": 0.3,
+    "null_simulations": 2000,
+    "null_seed": 0
+  },
+  "refit": {
+    "max_rounds": 2,
+    "mask_fwhm_multiple": 3.0
+  },
+  "peak_refine": {
+    "window_deg": 0.6,
+    "center_shift_max_deg": 0.15,
+    "fwhm_range_deg": [0.05, 1.0]
+  },
+  "kalpha2": {
+    "position_tolerance_deg": 0.05,
+    "intensity_ratio_range": [0.3, 0.75]
+  },
+  "phase_match": {
+    "tolerance_deg": 0.25
+  },
+  "detection_limit_lines": ["α-Fe(110)", "α-Fe(200)", "α-Fe(211)"],
+  "broad_component": {
+    "line": "α-Fe(110)",
+    "center_window_deg": 0.4,
+    "fwhm_range_deg": [0.3, 2.5],
+    "scherrer_k": 0.9
+  }
 }

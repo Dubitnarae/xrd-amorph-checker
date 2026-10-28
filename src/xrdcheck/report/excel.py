@@ -1,0 +1,131 @@
+"""Excel 보고서: 요약(시료당 1행) · 피크 · 설정·버전."""
+
+from __future__ import annotations
+
+import datetime as dt
+from pathlib import Path
+
+from openpyxl import Workbook
+from openpyxl.styles import Alignment, Font, PatternFill
+from openpyxl.utils import get_column_letter
+
+from xrdcheck import __version__
+from xrdcheck.model import AnalysisResult
+from xrdcheck.report.text import format_p
+from xrdcheck.settings import flatten
+
+VERDICT_FILL = {"비정질": "C8E6C9", "결정상 의심": "FFE0B2", "결정상 검출": "FFCDD2", "판정 불가": "E0E0E0"}
+HEADER_FILL = PatternFill("solid", fgColor="ECEFF1")
+
+
+def _r(v, n):
+    return None if v is None else round(float(v), n)
+
+
+def _dl(r: AnalysisResult, label: str):
+    for d in r.detection_limits:
+        if d["label"] == label:
+            return _r(d["counts"], 1)
+    return None
+
+
+def summary_row(r: AnalysisResult, dl_labels: list[str]) -> dict:
+    p, h, b = r.pattern, r.halo, r.broad or {}
+    counted = r.counted_peaks
+    row = {
+        "파일": p.source_path.name,
+        "시료명": p.sample_name,
+        "측정일": p.measurement_date.isoformat() if p.measurement_date else "",
+        "측정일 근거": p.date_source,
+        "판정": r.verdict.value,
+        "결과 문장": r.sentence,
+        "주 halo 2θ(°)": _r(h.center, 3) if h else None,
+        "FWHM(°)": _r(h.fwhm, 2) if h else None,
+        "FWHM 좌(°)": _r(h.fwhm_left, 2) if h else None,
+        "FWHM 우(°)": _r(h.fwhm_right, 2) if h else None,
+        "d(Å)": _r(h.d_A, 4) if h else None,
+        "q(1/Å)": _r(h.q_invA, 3) if h else None,
+        "r1(Å)": _r(h.r1_A, 3) if h else None,
+        "제2 halo 2θ(°)": _r(h.second_center, 2) if h else None,
+        "제2 halo FWHM(°)": _r(h.second_fwhm, 2) if h else None,
+        "χ²red": _r(h.chi2_red, 3) if h else None,
+        "z최대": _r(r.z_max, 2),
+        "z최대 위치(°)": _r(r.z_max_at, 2),
+        "우연확률": format_p(r.p_chance) if r.p_chance is not None else "",
+        "검출 피크 수": sum(pk.significant for pk in counted),
+        "의심 피크 수": sum(not pk.significant for pk in counted),
+        "매칭 상": ", ".join(sorted({m for pk in counted for m in pk.matches})),
+    }
+    for label in dl_labels:
+        row[f"검출한계 {label}(counts)"] = _dl(r, label)
+    row.update({
+        "넓은 성분 ΔBIC(참고)": _r(b.get("delta_bic"), 1),
+        "넓은 성분 FWHM(°)(참고)": _r(b.get("fwhm_deg"), 2),
+        "넓은 성분 Scherrer(nm, 보정 전)": _r(b.get("scherrer_nm_uncorrected"), 1),
+        "최대 counts": _r(p.max_counts, 0),
+        "점 개수": p.n_points,
+        "재피팅 횟수": r.refit_rounds,
+        "판정 근거": " / ".join(r.reasons),
+        "경고": " / ".join(r.warnings),
+        "원본 경로": str(p.source_path),
+    })
+    return row
+
+
+PEAK_COLUMNS = ["파일", "시료명", "2θ(°)", "z", "단계", "높이(counts)", "FWHM(°)", "면적", "d(Å)",
+                "매칭", "매칭 신뢰도", "딸린 피크(Kα2·꼬리)", "국소 피팅", "비고"]
+
+
+def _write_table(ws, columns: list[str], rows: list[list]) -> None:
+    ws.append(columns)
+    for c in ws[1]:
+        c.font = Font(bold=True)
+        c.fill = HEADER_FILL
+        c.alignment = Alignment(wrap_text=True, vertical="center")
+    for row in rows:
+        ws.append(row)
+    ws.freeze_panes = "A2"
+    for i, col in enumerate(columns, 1):
+        width = max([len(str(col))] + [len(str(r[i - 1])) for r in rows if r[i - 1] is not None][:200])
+        ws.column_dimensions[get_column_letter(i)].width = min(max(8, width * 1.3), 60)
+
+
+def write_excel(results: list[AnalysisResult], path: str | Path) -> Path:
+    from xrdcheck.analysis.profiles import d_spacing
+
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    wb = Workbook()
+    settings = results[0].settings if results else {}
+    dl_labels = settings.get("detection_limit_lines", [])
+
+    ws = wb.active
+    ws.title = "요약"
+    rows = [summary_row(r, dl_labels) for r in results]
+    columns = list(rows[0].keys()) if rows else ["파일"]
+    _write_table(ws, columns, [list(r.values()) for r in rows])
+    vcol = columns.index("판정") + 1 if "판정" in columns else None
+    if vcol:
+        for i, r in enumerate(results, 2):
+            ws.cell(i, vcol).fill = PatternFill("solid", fgColor=VERDICT_FILL.get(r.verdict.value, "FFFFFF"))
+    if "결과 문장" in columns:
+        ws.column_dimensions[get_column_letter(columns.index("결과 문장") + 1)].width = 80
+
+    wp = wb.create_sheet("피크")
+    peak_rows = []
+    for r in results:
+        for pk in r.peaks:
+            peak_rows.append([
+                r.pattern.source_path.name, r.pattern.sample_name, _r(pk.two_theta, 3), _r(pk.z, 2), pk.level,
+                _r(pk.height, 1), _r(pk.fwhm, 3), _r(pk.area, 2), _r(d_spacing(pk.two_theta, r.pattern.kalpha1_A), 4),
+                ", ".join(pk.matches), pk.match_confidence, f"{pk.satellite_of:.2f}° 피크에 딸림" if pk.satellite_of else "",
+                "성공" if pk.refined else "실패", " / ".join(pk.notes),
+            ])
+    _write_table(wp, PEAK_COLUMNS, peak_rows)
+
+    wsv = wb.create_sheet("설정·버전")
+    info = [("프로그램", "XRD 비정질 판정 도우미 (xrdcheck)"), ("버전", __version__),
+            ("보고서 작성", dt.datetime.now().strftime("%Y-%m-%d %H:%M:%S")), ("시료 수", len(results))]
+    _write_table(wsv, ["항목", "값"], [list(i) for i in info] + [[k, str(v)] for k, v in flatten(settings)])
+    wb.save(path)
+    return path
