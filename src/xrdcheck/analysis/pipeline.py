@@ -72,7 +72,10 @@ def analyze(pattern: Pattern, settings: dict | None = None, library: list[dict] 
 
     flag_kalpha2(peaks, lam, pattern.kalpha2_A, settings)
     lines = phase_lines(library, lam, float(x[0]), float(x[-1]))
-    match_peaks(peaks, lines, settings, det.min_height)
+    match_peaks(peaks, lines, settings, det.min_height, lam)
+    for p in peaks:
+        if p.contaminant:
+            result.warnings.append(f"{p.two_theta:.2f}° 피크는 {'/'.join(p.matches)} — 오염·시료홀더 가능성, 판정에서 제외했습니다.")
     verdict, reasons = decide(peaks)
 
     result.halo, result.z, result.peaks, result.fit_mask = fit, z, peaks, mask

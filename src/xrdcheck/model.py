@@ -101,12 +101,18 @@ class Peak:
     matches: list[str] = field(default_factory=list)  # 예: ["α-Fe(110)"]
     match_confidence: str = ""  # "높음" | "낮음" | ""
     satellite_of: float | None = None  # 더 강한 피크의 Kα2·꼬리로 판단되면 그 피크의 2θ
+    contaminant: bool = False  # 오염·홀더 상(석영 등)에만 매칭됨 → 판정에서 제외
     notes: list[str] = field(default_factory=list)
 
     @property
     def counted(self) -> bool:
-        """판정에 세는 피크인지(Kα2·꼬리는 별도 피크로 세지 않음)."""
-        return self.satellite_of is None
+        """판정에 세는 피크인지(Kα2·꼬리, 오염 상 피크는 세지 않음)."""
+        return self.satellite_of is None and not self.contaminant
+
+    @property
+    def accepted_match(self) -> bool:
+        """판정에서 매칭으로 인정하는지(최강선이 안 보이는 '낮음' 매칭은 인정하지 않음)."""
+        return bool(self.matches) and self.match_confidence in ("높음", "보통")
 
     @property
     def significant(self) -> bool:

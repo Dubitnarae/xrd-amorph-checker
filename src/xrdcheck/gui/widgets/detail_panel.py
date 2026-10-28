@@ -68,7 +68,9 @@ def result_html(r: AnalysisResult) -> str:
         out.append("<h3>협폭 피크</h3><table><tr><th>2θ</th><th>z</th><th>높이</th><th>FWHM</th><th>매칭</th></tr>")
         for pk in r.peaks:
             style = "" if pk.counted else " class='muted'"
-            match = ", ".join(pk.matches) or ("딸린 피크" if not pk.counted else "없음")
+            match = ", ".join(pk.matches) or ("딸린 피크" if pk.satellite_of else "없음")
+            if pk.contaminant:
+                match += " — 오염·홀더(판정 제외)"
             if pk.match_confidence:
                 match += f" ({pk.match_confidence})"
             out.append(f"<tr{style}><td class='num'>{pk.two_theta:.2f}</td><td class='num'>{pk.z:.1f}</td>"

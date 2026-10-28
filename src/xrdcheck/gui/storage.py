@@ -78,10 +78,21 @@ def validate_library_text(text: str) -> str | None:
         lines = ph.get("lines")
         if not isinstance(lines, list) or not lines:
             return f"'{ph['name']}'에 'lines'가 없습니다."
+        a_range = ph.get("cubic_a_range_A")
+        if a_range is not None:
+            try:
+                lo, hi = (float(v) for v in a_range)
+                if not 0 < lo <= hi:
+                    raise ValueError
+            except (TypeError, ValueError):
+                return f"'{ph['name']}'의 cubic_a_range_A는 [최소, 최대](Å, 0 < 최소 ≤ 최대)여야 합니다."
         for ln in lines:
             try:
-                if float(ln["d_A"]) <= 0 or float(ln["rel"]) <= 0 or not str(ln["hkl"]):
+                if float(ln["rel"]) <= 0 or not str(ln["hkl"]).isdigit():
+                    raise ValueError
+                if a_range is None and float(ln["d_A"]) <= 0:
                     raise ValueError
             except (KeyError, TypeError, ValueError):
-                return f"'{ph['name']}'의 선 {ln}에 hkl·d_A(>0)·rel(>0)이 필요합니다."
+                need = "hkl(숫자)·rel(>0)" if a_range is not None else "hkl(숫자)·d_A(>0)·rel(>0)"
+                return f"'{ph['name']}'의 선 {ln}에 {need}이 필요합니다."
     return None

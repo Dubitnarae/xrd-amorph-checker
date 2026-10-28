@@ -73,7 +73,7 @@ def summary_row(r: AnalysisResult, dl_labels: list[str]) -> dict:
 
 
 PEAK_COLUMNS = ["파일", "시료명", "2θ(°)", "z", "단계", "높이(counts)", "FWHM(°)", "면적", "d(Å)",
-                "매칭", "매칭 신뢰도", "딸린 피크(Kα2·꼬리)", "국소 피팅", "비고"]
+                "매칭", "매칭 신뢰도", "판정 제외 사유", "국소 피팅", "비고"]
 
 
 def _write_table(ws, columns: list[str], rows: list[list]) -> None:
@@ -118,7 +118,7 @@ def write_excel(results: list[AnalysisResult], path: str | Path) -> Path:
             peak_rows.append([
                 r.pattern.source_path.name, r.pattern.sample_name, _r(pk.two_theta, 3), _r(pk.z, 2), pk.level,
                 _r(pk.height, 1), _r(pk.fwhm, 3), _r(pk.area, 2), _r(d_spacing(pk.two_theta, r.pattern.kalpha1_A), 4),
-                ", ".join(pk.matches), pk.match_confidence, f"{pk.satellite_of:.2f}° 피크에 딸림" if pk.satellite_of else "",
+                ", ".join(pk.matches), pk.match_confidence, (f"{pk.satellite_of:.2f}° 피크에 딸림" if pk.satellite_of else "오염·홀더 상(판정 제외)" if pk.contaminant else ""),
                 "성공" if pk.refined else "실패", " / ".join(pk.notes),
             ])
     _write_table(wp, PEAK_COLUMNS, peak_rows)

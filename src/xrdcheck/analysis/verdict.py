@@ -15,7 +15,7 @@ def decide(peaks: list[Peak]) -> tuple[Verdict, list[str]]:
     counted = [p for p in peaks if p.counted]
     sig = [p for p in counted if p.significant]
     sus = [p for p in counted if not p.significant]
-    matched = [p for p in sig if p.matches]
+    matched = [p for p in sig if p.accepted_match]
     if sig and (matched or len(sig) >= 2):
         reasons = []
         if matched:
@@ -27,7 +27,9 @@ def decide(peaks: list[Peak]) -> tuple[Verdict, list[str]]:
     if sig or sus:
         reasons = []
         if sig:
-            reasons.append(f"검출 기준 이상 단일 피크({sig[0].two_theta:.2f}°)가 라이브러리와 매칭되지 않음")
+            pk = sig[0]
+            why = "최강선이 보이지 않아 매칭 불인정" if pk.matches else "라이브러리와 매칭되지 않음"
+            reasons.append(f"검출 기준 이상 단일 피크({pk.two_theta:.2f}°{' ' + '/'.join(pk.matches) if pk.matches else ''}) — {why}")
         if sus:
             reasons.append("의심 구간 피크: " + ", ".join(f"{p.two_theta:.2f}°(z {p.z:.1f})" for p in sus))
         return Verdict.SUSPECT, reasons

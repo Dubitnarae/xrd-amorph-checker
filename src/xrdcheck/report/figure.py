@@ -69,6 +69,11 @@ def make_figure(r: AnalysisResult, yscale: str = "sqrt", show_phases: bool = Tru
             matched = {m for pk in r.peaks for m in pk.matches}
             for ln in r.phase_lines:
                 hit = ln["label"] in matched
+                if ln.get("two_theta_max", ln["two_theta"]) - ln.get("two_theta_min", ln["two_theta"]) > 0.05:
+                    ax.axvspan(ln["two_theta_min"], ln["two_theta_max"], color="#c62828" if hit else "#90a4ae",
+                               alpha=0.12 if hit else 0.06, lw=0)
+                    if not hit:
+                        continue
                 ax.axvline(ln["two_theta"], color="#c62828" if hit else "#90a4ae", lw=0.8 if hit else 0.5,
                            ls="-" if hit else ":", alpha=0.9 if hit else 0.6)
                 if hit:

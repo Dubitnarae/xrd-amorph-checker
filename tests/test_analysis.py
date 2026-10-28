@@ -179,9 +179,10 @@ def test_phase_lines_from_library():
     assert lines["Fe3O4(311)"] == pytest.approx(35.43, abs=0.01)
 
 
-def _pk(tt, z, matches=(), sat=None):
+def _pk(tt, z, matches=(), sat=None, conf=None):
     return Peak(two_theta=tt, z=z, height=30, fwhm=0.15, area=5, level="검출" if z >= 5 else "의심",
-                matches=list(matches), satellite_of=sat)
+                matches=list(matches), satellite_of=sat,
+                match_confidence=conf if conf is not None else ("높음" if matches else ""))
 
 
 @pytest.mark.parametrize(
@@ -193,6 +194,8 @@ def _pk(tt, z, matches=(), sat=None):
         ([_pk(61, 19)], Verdict.SUSPECT),
         ([_pk(44.67, 4.7, ["α-Fe(110)"])], Verdict.SUSPECT),
         ([_pk(61, 7), _pk(61.2, 6, sat=61)], Verdict.SUSPECT),  # Kα2는 세지 않음
+        ([_pk(65.5, 30, ["α-Fe(Si)(200)"], conf="낮음")], Verdict.SUSPECT),  # 최강선 없는 매칭은 불인정
+        ([_pk(65.5, 30, ["α-Fe(Si)(200)"], conf="보통")], Verdict.DETECTED),
     ],
 )
 def test_verdict_rules(peaks, verdict):
@@ -217,3 +220,52 @@ def test_pseudo_voigt_area():
     for eta in (0, 0.5, 1):
         num = np.trapezoid(pseudo_voigt(x, 3, 0, 0.2, eta), x)
         assert pseudo_voigt_area(3, 0.2, eta) == pytest.approx(num, rel=0.01)
+
+
+# ---------------------------------------------------------------- Phase 4: 라이브러리 확장
+
+
+def _bcc_tt(a, n, lam=1.540598):
+    from xrdcheck.analysis.profiles import two_theta_from_d
+
+    return two_theta_from_d(a / np.sqrt(n), lam)
+
+
+def test_alpha_fe_si_range_match():
+    """Si 고용 α-Fe(a = 2.840 Å)는 순수 α-Fe 허용오차 밖이지만 α-Fe(Si) 범위로 매칭된다."""
+    p = _synthetic()
+    for n, h in ((2, 80), (4, 25), (6, 30)):
+        p.counts = p.counts + gaussian(p.two_theta, h, _bcc_tt(2.840, n), 0.15)
+    r = analyze(p)
+    assert r.verdict == Verdict.DETECTED
+    labels = {m for pk in r.counted_peaks for m in pk.matches}
+    assert {"α-Fe(Si)(110)", "α-Fe(Si)(200)", "α-Fe(Si)(211)"} <= labels
+    assert "α-Fe(110)" not in labels  # 45.1°는 순수 α-Fe(44.67 ± 0.25°) 밖
+
+
+def test_quartz_is_contaminant_not_crystallization():
+    p = _synthetic()
+    p.counts = p.counts + gaussian(p.two_theta, 40, 26.64, 0.15)
+    r = analyze(p)
+    assert r.verdict == Verdict.AMORPHOUS
+    q = [pk for pk in r.peaks if pk.contaminant]
+    assert q and "석영 SiO2(101)" in q[0].matches
+    assert any("오염" in w for w in r.warnings)
+
+
+def test_single_peak_without_strongest_line_is_suspect():
+    """65.5°의 강한 단일 피크: α-Fe(Si)(200) 자리지만 (110)이 안 보이므로 매칭 불인정 → 의심."""
+    p = _synthetic()
+    p.counts = p.counts + gaussian(p.two_theta, 150, 65.5, 0.2)
+    r = analyze(p)
+    assert r.verdict == Verdict.SUSPECT
+    pk = r.counted_peaks[0]
+    assert pk.match_confidence == "낮음" and any("(110)" in n for n in pk.notes)
+
+
+def test_library_validation_accepts_range_phase():
+    from xrdcheck.gui.storage import default_library_text, validate_library_text
+
+    assert validate_library_text(default_library_text()) is None
+    bad = '{"phases": [{"name": "X", "cubic_a_range_A": [3, 2], "lines": [{"hkl": "110", "rel": 100}]}]}'
+    assert "cubic_a_range_A" in validate_library_text(bad)
