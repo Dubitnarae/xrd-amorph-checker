@@ -11,17 +11,18 @@ import re
 from pathlib import Path, PureWindowsPath
 
 from xrdcheck.io.generic_xy import read_generic_xy
+from xrdcheck.io.rasx import read_rasx
 from xrdcheck.io.rtf_meta import read_rtf_meta
 from xrdcheck.io.xpert_csv import is_xpert_csv, read_xpert_csv
 from xrdcheck.io.xrdml import read_xrdml
 from xrdcheck.model import Pattern
 
-SUPPORTED_SUFFIXES = (".xrdml", ".csv", ".xy", ".txt", ".dat")
+SUPPORTED_SUFFIXES = (".xrdml", ".rasx", ".csv", ".xy", ".txt", ".dat")
 MIN_PLAUSIBLE_YEAR = 2010  # 이보다 이른 내부 연도는 장비 시계 오류로 본다
 
 _DATE8 = re.compile(r"(?<!\d)(20\d{2})(\d{2})(\d{2})(?!\d)")
 _DATE6 = re.compile(r"(?<!\d)(\d{2})(\d{2})(\d{2})(?!\d)")
-_YEAR_DIR = re.compile(r"^(20\d{2})$")
+_YEAR_DIR = re.compile(r"^(20\d{2})년?$")  # "2026" 또는 "2026년"
 _MMDD_DIR = re.compile(r"^(\d{2})(\d{2})(?!\d)")
 _YEAR_IN_TEXT = re.compile(r"(?<!\d)((?:19|20)\d{2})(?!\d)")
 
@@ -41,7 +42,7 @@ def _make_date(y: int, m: int, d: int) -> dt.date | None:
 
 
 def date_from_regex(stem: str, regex: str) -> dt.date | None:
-    """사용자 정규식. 이름 붙은 그룹 y(4자리) 또는 yy(2자리), m, d를 쓴다. 예: (?P<yy>\d{2})(?P<m>\d{2})(?P<d>\d{2})"""
+    r"""사용자 정규식. 이름 붙은 그룹 y(4자리) 또는 yy(2자리), m, d를 쓴다. 예: (?P<yy>\d{2})(?P<m>\d{2})(?P<d>\d{2})"""
     m = re.search(regex, stem)
     if not m:
         return None
@@ -131,6 +132,8 @@ def load_pattern(path: str | Path, *, user_date: dt.date | None = None, read_rtf
         raise UnsupportedFileError(f"RTF 보고서에는 수치 데이터가 없습니다. 같은 이름의 .xrdml 또는 .csv를 여세요: {path.name}")
     if suffix == ".xrdml":
         p = read_xrdml(path)
+    elif suffix == ".rasx":
+        p = read_rasx(path)
     elif suffix == ".csv":
         head = path.read_text(encoding="cp1252", errors="replace")
         p = read_xpert_csv(path) if is_xpert_csv(head) else read_generic_xy(path)

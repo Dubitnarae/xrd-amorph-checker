@@ -7,22 +7,25 @@ from pathlib import Path
 
 from PySide6.QtCore import QSettings, Qt, QTimer, QUrl
 from PySide6.QtGui import QAction, QDesktopServices, QKeySequence
-from PySide6.QtWidgets import (QApplication, QFileDialog, QLabel, QMainWindow, QMessageBox, QProgressBar,
-                               QProgressDialog, QSplitter, QToolBar)
+from PySide6.QtWidgets import (QApplication, QFileDialog, QInputDialog, QLabel, QMainWindow, QMessageBox,
+                               QProgressBar, QProgressDialog, QSplitter, QToolBar, QVBoxLayout, QWidget)
 
 from xrdcheck import __author__, __version__, updater
 from xrdcheck.cli import collect_files
 from xrdcheck.gui.storage import UserStore
+from xrdcheck.gui.widgets.accuracy_dialog import AccuracyDialog
 from xrdcheck.gui.widgets.detail_panel import DetailPanel
 from xrdcheck.gui.widgets.plot_view import PlotView
 from xrdcheck.gui.widgets.result_table import ResultTable, result_key
+from xrdcheck.gui.widgets.review_bar import ReviewBar
 from xrdcheck.gui.widgets.settings_dialog import SettingsDialog
 from xrdcheck.gui.widgets.update_worker import UpdateCheckWorker, UpdateDownloadWorker
 from xrdcheck.gui.widgets.worker import AnalysisWorker
 from xrdcheck.io import SUPPORTED_SUFFIXES
 from xrdcheck.model import AnalysisResult
 from xrdcheck.report.data_csv import write_processed_csv
-from xrdcheck.report.excel import write_excel
+from xrdcheck.report.excel import write_excel, write_review_excel
+from xrdcheck.review import ReviewStore, confusion
 from xrdcheck.report.figure import make_compare_figure, make_figure, save_figure
 
 APP_TITLE = "XRD 비정질 판정 도우미"
@@ -39,6 +42,7 @@ class MainWindow(QMainWindow):
         self.qs = QSettings(str(self.store.gui_ini), QSettings.IniFormat)
         self.settings = self.store.load_settings()
         self.library = self.store.load_library()
+        self.reviews = ReviewStore(self.store.dir)
         self.results: dict[str, AnalysisResult] = {}
         self.pending: list[Path] = []
         self.worker: AnalysisWorker | None = None
@@ -57,8 +61,18 @@ class MainWindow(QMainWindow):
         self.table = ResultTable()
         self.plot = PlotView()
         self.detail = DetailPanel()
+        self.review_bar = ReviewBar()
+        self.review_bar.marked.connect(self.mark_review)
+        self.review_bar.memo_requested.connect(self.edit_review_memo)
+        self.review_bar.clear_requested.connect(self.clear_review)
+        right = QWidget()
+        rl = QVBoxLayout(right)
+        rl.setContentsMargins(0, 0, 0, 0)
+        rl.setSpacing(2)
+        rl.addWidget(self.detail, 1)
+        rl.addWidget(self.review_bar)
         self.splitter = QSplitter(Qt.Horizontal)
-        for w in (self.table, self.plot, self.detail):
+        for w in (self.table, self.plot, right):
             self.splitter.addWidget(w)
         self.splitter.setStretchFactor(1, 1)
         self.splitter.setSizes([470, 760, 370])
@@ -106,6 +120,12 @@ class MainWindow(QMainWindow):
         self.act_clear = self._act("모두 지우기", self.clear_all)
         self.act_reanalyze = self._act("다시 분석", self.reanalyze_all, "F5")
         self.act_settings = self._act("설정", self.open_settings, "Ctrl+,")
+        self.act_review_ok = self._act("판정 맞음", lambda: self.mark_review(None), "Ctrl+Return",
+                                       tip="선택한 시료의 프로그램 판정이 맞다고 기록")
+        self.act_review_filter = self._act("검토할 시료만 보기", self.apply_review_filter, "Ctrl+R", checkable=True,
+                                           tip="검토 추천인데 아직 검토하지 않은 시료와 판정이 틀린 시료만 목록에 보입니다")
+        self.act_accuracy = self._act("판정 정확도…", self.show_accuracy, tip="내 검토 결과로 만든 혼동표")
+        self.act_review_export = self._act("검토 기록 Excel 내보내기…", lambda: self.export_reviews())
         self.act_about = self._act("정보", self.show_about)
         self.act_update = self._act("업데이트 확인…", lambda: self.check_updates(silent=False))
         self.act_auto_update = self._act("시작할 때 업데이트 확인", self._set_auto_update, checkable=True)
@@ -115,7 +135,7 @@ class MainWindow(QMainWindow):
         tb.setMovable(False)
         self.addToolBar(tb)
         for a in (self.act_open, self.act_open_dir, None, self.act_excel, self.act_png, self.act_csv, None,
-                  self.act_compare, self.act_reanalyze, self.act_settings):
+                  self.act_compare, self.act_reanalyze, self.act_review_filter, self.act_settings):
             tb.addSeparator() if a is None else tb.addAction(a)
 
         m = self.menuBar().addMenu("파일")
@@ -130,6 +150,17 @@ class MainWindow(QMainWindow):
         m = self.menuBar().addMenu("보기")
         for a in (self.act_compare, self.act_remove, self.act_clear, self.act_reanalyze):
             m.addAction(a)
+        m = self.menuBar().addMenu("검토")
+        m.addAction(self.act_review_ok)
+        wrong = m.addMenu("판정 틀림")
+        for a in self.review_bar.wrong_menu.actions():
+            wrong.addAction(a)
+        m.addAction(self._act("검토 메모…", lambda: self.edit_review_memo()))
+        m.addAction(self._act("검토 지우기", self.clear_review))
+        m.addSeparator()
+        m.addAction(self.act_review_filter)
+        m.addAction(self.act_accuracy)
+        m.addAction(self.act_review_export)
         m = self.menuBar().addMenu("도구")
         m.addAction(self.act_settings)
         m = self.menuBar().addMenu("도움말")
@@ -247,7 +278,9 @@ class MainWindow(QMainWindow):
     def _on_result(self, r: AnalysisResult) -> None:
         key = result_key(r)
         self.results[key] = r
-        self.table.upsert(r)
+        self.table.upsert(r, self.reviews.get(r))
+        if self.act_review_filter.isChecked():
+            self.apply_review_filter()
         if not self.table.selected_keys():
             self.table.select_key(key)
         elif key in self.table.selected_keys():
@@ -292,16 +325,17 @@ class MainWindow(QMainWindow):
         sel = self.selected_results()
         compare = self.act_compare.isChecked()
         self.plot.set_compare_controls(compare)
+        self.review_bar.set_state(sel[0].verdict.value if sel else None, self.reviews.get(sel[0]) if sel else None)
         if not sel:
             self.plot.clear()
             self.detail.clear_result()
             return
         if compare:
             self.plot.show_compare(sel)
-            self.detail.set_compare(sel) if len(sel) > 1 else self.detail.set_result(sel[0])
+            self.detail.set_compare(sel) if len(sel) > 1 else self.detail.set_result(sel[0], self.reviews.get(sel[0]))
         else:
             self.plot.show_result(sel[0])
-            self.detail.set_result(sel[0])
+            self.detail.set_result(sel[0], self.reviews.get(sel[0]))
 
     def toggle_compare(self) -> None:
         if self.act_compare.isChecked() and len(self.table.selected_keys()) < 2:
@@ -341,7 +375,7 @@ class MainWindow(QMainWindow):
         if not path:
             return None
         try:
-            write_excel(results, path)
+            write_excel(results, path, self.reviews)
         except PermissionError:
             self._report_error("저장 실패", PermissionError(f"{path.name}이(가) Excel에서 열려 있으면 닫고 다시 시도하세요."))
             return None
@@ -385,6 +419,95 @@ class MainWindow(QMainWindow):
             self._report_error("저장 실패", e)
             return None
         self.status.setText(f"CSV 저장: {path}")
+        return path
+
+    # ------------------------------------------------------------ 검토(판정 맞음/틀림)
+    def needs_review(self, key: str) -> bool:
+        """'검토할 시료만 보기'에 남길 시료: 검토 추천인데 아직 검토 안 함, 또는 내 판정과 지금 판정이 다름."""
+        r = self.results.get(key)
+        if r is None:
+            return True
+        e = self.reviews.get(r)
+        return (e is None and bool(r.review_hints)) or (e is not None and e["user_verdict"] != r.verdict.value)
+
+    def apply_review_filter(self) -> None:
+        on = self.act_review_filter.isChecked()
+        shown = self.table.apply_filter(self.needs_review if on else None)
+        if on:
+            self.status.setText(f"검토할 시료 {shown}개 / 전체 {self.table.rowCount()}개 — "
+                                "확인하고 [판정 맞음]/[판정 틀림]을 누르세요.")
+
+    def _select_next_visible(self, after_row: int) -> None:
+        for row in list(range(after_row, self.table.rowCount())) + list(range(0, after_row)):
+            if not self.table.isRowHidden(row):
+                self.table.selectRow(row)
+                return
+
+    def mark_review(self, user_verdict: str | None) -> int:
+        """선택한 시료에 내 판정을 기록한다. None이면 '프로그램 판정이 맞음'."""
+        sel = self.selected_results()
+        if not sel:
+            self.status.setText("검토할 시료를 목록에서 고르세요.")
+            return 0
+        first_row = min(i.row() for i in self.table.selectedIndexes())
+        try:
+            for r in sel:
+                self.reviews.set(r, user_verdict or r.verdict.value)
+        except OSError as e:
+            self._report_error("검토 저장 실패", e)
+            return 0
+        for r in sel:
+            self.table.set_review(r, self.reviews.get(r))
+        what = "판정 맞음" if user_verdict is None else f"실제 '{user_verdict}'(틀림)"
+        self.status.setText(f"{len(sel)}개 시료를 {what}으로 기록했습니다.")
+        if self.act_review_filter.isChecked():
+            self.apply_review_filter()
+            self._select_next_visible(first_row)  # 다음 검토할 시료로
+        self.refresh_view()
+        return len(sel)
+
+    def edit_review_memo(self, text: str | None = None) -> None:
+        r = self.current_result()
+        if r is None or self.reviews.get(r) is None:
+            self.status.setText("메모는 판정을 먼저 표시한 뒤에 적을 수 있습니다.")
+            return
+        if text is None:
+            text, ok = QInputDialog.getText(self, "검토 메모", f"{r.pattern.source_path.name} 메모:",
+                                            text=self.reviews.get(r).get("memo", ""))
+            if not ok:
+                return
+        self.reviews.set_memo(r, text)
+        self.table.set_review(r, self.reviews.get(r))
+        self.refresh_view()
+
+    def clear_review(self) -> None:
+        for r in self.selected_results():
+            self.reviews.remove(r)
+            self.table.set_review(r, None)
+        self.refresh_view()
+
+    def accuracy(self) -> tuple[dict, dict]:
+        """(목록의 지금 판정 기준, 저장된 전체·검토 당시 판정 기준) 혼동표."""
+        results = [self.results[k] for k in self.table.keys_in_order()]
+        return confusion(self.reviews, results), confusion(self.reviews)
+
+    def show_accuracy(self) -> None:
+        now, all_ = self.accuracy()
+        AccuracyDialog(now, all_, lambda: self.export_reviews(), self).exec()
+
+    def export_reviews(self, path=None) -> Path | None:
+        if not self.reviews.data:
+            self.status.setText("저장된 검토 기록이 없습니다.")
+            return None
+        path = self._save_path("검토 기록 저장", "XRD_검토기록.xlsx", "Excel (*.xlsx)", path)
+        if not path:
+            return None
+        try:
+            write_review_excel(self.reviews, [self.results[k] for k in self.table.keys_in_order()], path)
+        except PermissionError:
+            self._report_error("저장 실패", PermissionError(f"{path.name}이(가) Excel에서 열려 있으면 닫고 다시 시도하세요."))
+            return None
+        self.status.setText(f"검토 기록 저장: {path}")
         return path
 
     # ------------------------------------------------------------ 설정·정보

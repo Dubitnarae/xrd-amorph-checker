@@ -46,7 +46,19 @@ def _size_cols(r: AnalysisResult) -> dict:
     }
 
 
-def summary_row(r: AnalysisResult, dl_labels: list[str]) -> dict:
+def _lattice_cols(r: AnalysisResult) -> dict:
+    lat = r.lattice or {}
+    return {
+        "격자상수 a(Å, 참고)": _r(lat.get("a_A"), 4),
+        "a 오차(Å)": _r(lat.get("a_err_A"), 4),
+        "a 외삽(Å)": _r(lat.get("a_extrap_A"), 4),
+        "Si 함량(at%, 참고)": _r(lat.get("si_at"), 1),
+        "Si 오차(at%)": _r(lat.get("si_err_at"), 1),
+        "격자상수 근거 피크": "; ".join(f"{u['label']} {u['two_theta']:.2f}°" for u in lat.get("lines", [])),
+    }
+
+
+def summary_row(r: AnalysisResult, dl_labels: list[str], reviews=None) -> dict:
     p, h, b = r.pattern, r.halo, r.broad or {}
     counted = r.counted_peaks
     row = {
@@ -58,6 +70,7 @@ def summary_row(r: AnalysisResult, dl_labels: list[str]) -> dict:
         "판정": r.verdict.value,
         "나노결정": (r.nano or {}).get("label", ""),
         **_size_cols(r),
+        **_lattice_cols(r),
         "결과 문장": r.sentence,
         "주 halo 2θ(°)": _r(h.center, 3) if h else None,
         "FWHM(°)": _r(h.fwhm, 2) if h else None,
@@ -86,9 +99,15 @@ def summary_row(r: AnalysisResult, dl_labels: list[str]) -> dict:
         "점 개수": p.n_points,
         "재피팅 횟수": r.refit_rounds,
         "판정 근거": " / ".join(r.reasons),
+        "검토 추천 이유": " / ".join(r.review_hints),
         "경고": " / ".join(r.warnings),
         "원본 경로": str(p.source_path),
     })
+    if reviews is not None:
+        rv = reviews.get(r) or {}
+        row["내 판정"] = rv.get("user_verdict", "")
+        row["판정 일치"] = ("O" if rv["user_verdict"] == r.verdict.value else "X") if rv else ""
+        row["검토 메모"] = rv.get("memo", "")
     return row
 
 
@@ -110,7 +129,7 @@ def _write_table(ws, columns: list[str], rows: list[list]) -> None:
         ws.column_dimensions[get_column_letter(i)].width = min(max(8, width * 1.3), 60)
 
 
-def write_excel(results: list[AnalysisResult], path: str | Path) -> Path:
+def write_excel(results: list[AnalysisResult], path: str | Path, reviews=None) -> Path:
     from xrdcheck.analysis.profiles import d_spacing
 
     path = Path(path)
@@ -121,7 +140,7 @@ def write_excel(results: list[AnalysisResult], path: str | Path) -> Path:
 
     ws = wb.active
     ws.title = "요약"
-    rows = [summary_row(r, dl_labels) for r in results]
+    rows = [summary_row(r, dl_labels, reviews) for r in results]
     columns = list(rows[0].keys()) if rows else ["파일"]
     _write_table(ws, columns, [list(r.values()) for r in rows])
     vcol = columns.index("판정") + 1 if "판정" in columns else None
@@ -147,5 +166,38 @@ def write_excel(results: list[AnalysisResult], path: str | Path) -> Path:
     info = [("프로그램", "XRD 비정질 판정 도우미 (xrdcheck)"), ("버전", __version__),
             ("보고서 작성", dt.datetime.now().strftime("%Y-%m-%d %H:%M:%S")), ("시료 수", len(results))]
     _write_table(wsv, ["항목", "값"], [list(i) for i in info] + [[k, str(v)] for k, v in flatten(settings)])
+    wb.save(path)
+    return path
+
+
+def write_review_excel(store, results: list[AnalysisResult], path: str | Path) -> Path:
+    """검토 기록(저장된 전체)과 혼동표(목록의 지금 판정 기준)를 Excel로 저장한다."""
+    from xrdcheck.review import VERDICTS, confusion
+
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "검토 기록"
+    now = {}
+    for r in results:
+        if (e := store.get(r)) is not None:
+            now[id(e)] = r.verdict.value
+    cols = ["파일", "내 판정", "검토 당시 판정", "검토 당시 버전", "목록의 지금 판정", "메모", "검토 일시", "파일 해시", "경로"]
+    rows = [[e["file"], e["user_verdict"], e["program_verdict"], e["program_version"], now.get(id(e), ""),
+             e.get("memo", ""), e["reviewed_at"], k, e["path"]] for k, e in sorted(store.data.items(), key=lambda kv: kv[1]["file"])]
+    _write_table(ws, cols, rows)
+    wc = wb.create_sheet("혼동표")
+    c = confusion(store, results)
+    wc.append(["내 판정(행) × 프로그램 판정(열)"] + VERDICTS)
+    for u in VERDICTS:
+        wc.append([u] + [c["matrix"][u][p] or None for p in VERDICTS])
+    for i in range(len(VERDICTS)):
+        cell = wc.cell(i + 2, i + 2)
+        cell.fill = PatternFill("solid", fgColor="C8E6C9")
+    wc.append([])
+    wc.append(["검토 수", c["n"]])
+    wc.append(["정확도", None if c["accuracy"] is None else round(c["accuracy"] * 100, 1)])
+    wc.column_dimensions["A"].width = 28
     wb.save(path)
     return path

@@ -10,6 +10,7 @@ import numpy as np
 from xrdcheck import __version__
 from xrdcheck.analysis.broad import broad_indicator
 from xrdcheck.analysis.halo import HaloFitError, fit_halo
+from xrdcheck.analysis.lattice import estimate_lattice
 from xrdcheck.analysis.nano import classify_nano
 from xrdcheck.analysis.peaks import Doublet, NarrowDetector, detect_peaks, flag_kalpha2
 from xrdcheck.analysis.phases import detect_system, load_library, match_peaks, phase_lines
@@ -18,6 +19,7 @@ from xrdcheck.analysis.verdict import decide
 from xrdcheck.io import load_pattern
 from xrdcheck.model import AnalysisResult, Pattern, Verdict
 from xrdcheck.report.text import build_sentence
+from xrdcheck.review import review_hints
 from xrdcheck.settings import load_settings
 
 
@@ -44,6 +46,7 @@ def analyze(pattern: Pattern, settings: dict | None = None, library: list[dict] 
     if blockers:
         result.reasons = blockers
         result.sentence = build_sentence(result)
+        result.review_hints = review_hints(result)
         return result
 
     x, y, lam = pattern.two_theta, pattern.counts, pattern.kalpha1_A
@@ -69,6 +72,7 @@ def analyze(pattern: Pattern, settings: dict | None = None, library: list[dict] 
     except HaloFitError as e:
         result.reasons = [str(e)]
         result.sentence = build_sentence(result)
+        result.review_hints = review_hints(result)
         return result
 
     flag_kalpha2(peaks, lam, pattern.kalpha2_A, settings)
@@ -121,5 +125,7 @@ def analyze(pattern: Pattern, settings: dict | None = None, library: list[dict] 
         lo, hi = settings["nanocrystal"]["size_range_nm"]
         result.verdict = Verdict.NANO
         result.reasons.append(f"주 halo 위 피크 {s['two_theta']:.2f}°의 Scherrer 크기 {s['size_nm']:.1f} nm가 나노결정 범위({lo:g}–{hi:g} nm) 안")
+    result.lattice = estimate_lattice(result, settings)
     result.sentence = build_sentence(result)
+    result.review_hints = review_hints(result)
     return result

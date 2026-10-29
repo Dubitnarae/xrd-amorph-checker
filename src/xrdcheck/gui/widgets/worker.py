@@ -7,6 +7,7 @@ from pathlib import Path
 from PySide6.QtCore import QThread, Signal
 
 from xrdcheck.analysis.pipeline import analyze_file
+from xrdcheck.review import result_file_key
 
 
 class AnalysisWorker(QThread):
@@ -24,7 +25,9 @@ class AnalysisWorker(QThread):
             if self.isInterruptionRequested():
                 break
             try:
-                self.result_ready.emit(analyze_file(f, self.settings, self.library))
+                r = analyze_file(f, self.settings, self.library)
+                result_file_key(r)  # 검토 기록용 파일 해시를 여기서 미리 계산(화면 스레드가 파일을 다시 읽지 않게)
+                self.result_ready.emit(r)
             except Exception as e:  # 한 파일이 실패해도 나머지는 계속
                 self.failed.emit(str(f), str(e))
             self.progress.emit(k, total)

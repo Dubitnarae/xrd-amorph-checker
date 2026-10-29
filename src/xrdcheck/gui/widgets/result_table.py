@@ -1,4 +1,4 @@
-"""왼쪽 시료 목록: 시료명 | 판정 배지 | halo 중심 | FWHM | z최대 | 경고."""
+"""왼쪽 시료 목록: 시료명 | 판정 배지 | 나노결정 | 검토 | halo 중심 | FWHM | z최대 | 경고."""
 
 from __future__ import annotations
 
@@ -8,10 +8,13 @@ from PySide6.QtWidgets import QAbstractItemView, QHeaderView, QTableWidget, QTab
 
 from xrdcheck.model import AnalysisResult
 from xrdcheck.report.figure import VERDICT_COLORS
+from xrdcheck.review import status_text
 
 KEY_ROLE = Qt.UserRole
 SORT_ROLE = Qt.UserRole + 1
-COLUMNS = ["시료명", "판정", "나노결정", "halo 2θ", "FWHM", "z최대", "경고"]
+COLUMNS = ["시료명", "판정", "나노결정", "검토", "halo 2θ", "FWHM", "z최대", "경고"]
+COL_REVIEW, COL_WARN = 3, 7
+REVIEW_ORDER = {"추천": 0, "": 3}  # ✗(틀림) 1, ✓(맞음) 2
 VERDICT_ORDER = {"비정질": 0, "결정상 의심": 1, "나노결정상 후보": 2, "결정상 검출": 3, "판정 불가": 4}
 _ICONS: dict[str, QIcon] = {}
 
@@ -79,7 +82,7 @@ class ResultTable(QTableWidget):
                 return row
         return -1
 
-    def upsert(self, r: AnalysisResult) -> int:
+    def upsert(self, r: AnalysisResult, review: dict | None = None) -> int:
         key = result_key(r)
         self.setSortingEnabled(False)
         row = self._row_of(key)
@@ -92,6 +95,7 @@ class ResultTable(QTableWidget):
             (r.pattern.sample_name, r.pattern.sample_name.lower()),
             (v, VERDICT_ORDER.get(v, 9)),
             (_nano_short(r), _nano_short(r)),
+            (status_text(r, review, r.review_hints), None),
             (f"{h.center:.2f}" if h else "-", h.center if h else None),
             (f"{h.fwhm:.2f}" if h else "-", h.fwhm if h else None),
             (f"{r.z_max:.1f}" if r.z_max is not None else "-", r.z_max),
@@ -100,7 +104,7 @@ class ResultTable(QTableWidget):
         for col, (text, sort) in enumerate(cells):
             item = SortItem(text)
             item.setData(SORT_ROLE, sort)
-            if col > 2:
+            if col > COL_REVIEW:
                 item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
             self.setItem(row, col, item)
         self.item(row, 0).setData(KEY_ROLE, key)
@@ -110,11 +114,48 @@ class ResultTable(QTableWidget):
         badge.setBackground(QBrush(_tint(VERDICT_COLORS.get(v, "#616161"))))
         if r.nano:
             self.item(row, 2).setToolTip(r.nano["label"])
+        self._style_review(row, r, review)
         if r.warnings:
-            self.item(row, 6).setToolTip("\n".join(f"• {w}" for w in r.warnings))
-            self.item(row, 6).setForeground(QBrush(QColor("#ef6c00")))
+            self.item(row, COL_WARN).setToolTip("\n".join(f"• {w}" for w in r.warnings))
+            self.item(row, COL_WARN).setForeground(QBrush(QColor("#ef6c00")))
         self.setSortingEnabled(True)
         return self._row_of(key)
+
+    def _style_review(self, row: int, r: AnalysisResult, review: dict | None) -> None:
+        item = self.item(row, COL_REVIEW)
+        text = item.text()
+        item.setData(SORT_ROLE, REVIEW_ORDER.get(text, 1 if text.startswith("✗") else 2))
+        tips = []
+        if review:
+            tips.append(f"내 판정: {review['user_verdict']} (검토 {review['reviewed_at'][:10]}, "
+                        f"당시 프로그램 판정 {review['program_verdict']})")
+            if review.get("memo"):
+                tips.append(f"메모: {review['memo']}")
+            item.setForeground(QBrush(QColor("#2e7d32" if text.startswith("✓") else "#c62828")))
+        elif r.review_hints:
+            item.setForeground(QBrush(QColor("#1565c0")))
+        if r.review_hints:
+            tips.append("검토 추천 이유:\n" + "\n".join(f"• {h}" for h in r.review_hints))
+        item.setToolTip("\n".join(tips))
+
+    def set_review(self, r: AnalysisResult, review: dict | None) -> None:
+        """검토 칸만 다시 쓴다(분석을 다시 하지 않음)."""
+        row = self._row_of(result_key(r))
+        if row < 0:
+            return
+        self.setSortingEnabled(False)
+        self.item(row, COL_REVIEW).setText(status_text(r, review, r.review_hints))
+        self._style_review(row, r, review)
+        self.setSortingEnabled(True)
+
+    def apply_filter(self, keep) -> int:
+        """keep(key)가 True인 행만 보인다(None이면 모두). 보이는 행 수를 돌려준다."""
+        shown = 0
+        for row in range(self.rowCount()):
+            hide = keep is not None and not keep(self.item(row, 0).data(KEY_ROLE))
+            self.setRowHidden(row, hide)
+            shown += not hide
+        return shown
 
     def keys_in_order(self) -> list[str]:
         return [self.item(r, 0).data(KEY_ROLE) for r in range(self.rowCount())]

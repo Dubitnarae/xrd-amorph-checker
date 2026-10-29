@@ -22,7 +22,7 @@ class Pattern:
     two_theta: np.ndarray = field(repr=False)
     counts: np.ndarray = field(repr=False)
     source_path: Path
-    file_format: str  # "xrdml" | "xpert_csv" | "generic_xy"
+    file_format: str  # "xrdml" | "rasx" | "xpert_csv" | "generic_xy"
     sample_name: str
     kalpha1_A: float = CU_KALPHA1_A
     kalpha2_A: float | None = CU_KALPHA2_A
@@ -142,6 +142,8 @@ class AnalysisResult:
     refit_rounds: int = 0
     broad: dict | None = None
     nano: dict | None = None  # 나노결정 판정(analysis/nano.py)
+    lattice: dict | None = None  # α-Fe(Si) 격자상수·Si 함량(참고, analysis/lattice.py)
+    review_hints: list[str] = field(default_factory=list)  # 사람이 확인하면 좋은 이유(review.py)
     alloy_system: str = ""  # 판별한 합금계 표시명(예: "Fe계")
     phase_lines: list[dict] = field(default_factory=list, repr=False)  # 그래프용 상 기준선
     warnings: list[str] = field(default_factory=list)

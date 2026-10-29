@@ -8,6 +8,8 @@
 - 남은 주 halo 위 피크 중 가장 강한 피크로 **Scherrer 결정립 크기(nm)**를 내고, 크기가 10–90 nm
   (`nanocrystal.size_range_nm`)이면 판정을 "나노결정상 후보"로 바꾼다. 범위 밖이면 "결정상 검출" 그대로.
   D = K·λ / (β·cos θ), β = √(B² − b²) (B: 측정 FWHM(Kα1), b: 기기 FWHM — 2θ별 표에서 보간)
+- 붕화물·인화물·fcc 등 2차 상(role = secondary)에만 매칭된 피크는 주 halo 위에 있어도 나노결정 판단에서 뺀다
+  (`nanocrystal.exclude_secondary_peaks`, 2026-10-29 상 카드 추가와 함께).
 - 결정 분율 Xc = Ac / (Ac + Aa) (Ac: 결정 피크 면적(Kα2 포함), Aa: halo 면적). 산란인자 차이를 보정하지 않은 참고값.
 """
 
@@ -124,9 +126,16 @@ def classify_nano(r: AnalysisResult, settings: dict) -> dict | None:
     lam = r.pattern.kalpha1_A
     d_lo, d_hi = ns["size_range_nm"]
     on_halo = [p for p in r.counted_peaks if lo <= p.two_theta <= hi]
+    secondary = []
+    if ns.get("exclude_secondary_peaks", True):  # 붕화물 등 2차 상에만 매칭된 피크는 α-Fe(Si) 나노결정이 아니다
+        from xrdcheck.analysis.phases import secondary_only
+
+        secondary = [p for p in on_halo if secondary_only(p, r.phase_lines)]
+        on_halo = [p for p in on_halo if p not in secondary]
     sig = [p for p in on_halo if p.significant]
     out = {"label": NOT_NANO, "in_range": False, "window": (lo, hi), "halo_peaks": [p.two_theta for p in on_halo],
            "size": None, "other_sizes": [], "over_peaks": [], "xc": None,
+           "secondary_peaks": [(p.two_theta, "/".join(p.matches)) for p in secondary],
            "note": "필요조건(주 halo 위 피크) 확인. 크기는 Scherrer(K = %g, %g nm 이하만), 나노결정 범위 %g–%g nm, 기기 폭은 %s"
                    % (ns["scherrer_k"], ns["scherrer_max_nm"], d_lo, d_hi,
                       "표준시료 측정값" if ns["scherrer_instrument_measured"] else "실측 데이터 추정치(표준시료 미측정)")}

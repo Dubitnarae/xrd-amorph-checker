@@ -1,0 +1,256 @@
+#------------------------------------------------------------------------------
+#$Date: 2016-02-18 17:37:37 +0200 (Thu, 18 Feb 2016) $
+#$Revision: 176729 $
+#$URL: file:///home/coder/svn-repositories/_RELOADED_COD/cod-reloaded/cif/1/51/09/1510909.cif $
+#------------------------------------------------------------------------------
+#
+# This file is available in the Crystallography Open Database (COD),
+# http://www.crystallography.net/
+#
+# All data on this site have been placed in the public domain by the
+# contributors.
+#
+data_1510909
+loop_
+_publ_author_name
+'Hawig, R.'
+'Wibbecke, H.'
+'Khan, Y.'
+_publ_section_title
+;
+ Magnetische, elektrische Eigenschaten und Kristallisations- verhalten
+ amorpher Nbx Fe76 B24-x - Legierungen
+;
+_journal_name_full               'Zeitschrift fuer Metallkunde'
+_journal_page_first              646
+_journal_page_last               649
+_journal_volume                  82
+_journal_year                    1991
+_chemical_formula_sum            'B3 Fe10.66 Nb0.84'
+_chemical_name_systematic        '(Fe10.66 Nb0.84) B3'
+_space_group_IT_number           225
+_symmetry_space_group_name_Hall  '-F 4 2 3'
+_symmetry_space_group_name_H-M   'F m -3 m'
+_cell_angle_alpha                90
+_cell_angle_beta                 90
+_cell_angle_gamma                90
+_cell_formula_units_Z            8
+_cell_length_a                   10.819
+_cell_length_b                   10.819
+_cell_length_c                   10.819
+_cell_volume                     1266.372
+_citation_journal_id_ASTM        ZEMTAE
+_cod_data_source_file            boron_437.cif
+_cod_data_source_block           B3Fe10.66Nb0.84
+_cod_database_code               1510909
+loop_
+_symmetry_equiv_pos_as_xyz
+x,y,z
+-y,x,z
+-x,-y,z
+y,-x,z
+x,-y,-z
+y,x,-z
+-x,y,-z
+-y,-x,-z
+z,x,y
+-x,z,y
+-z,-x,y
+x,-z,y
+z,-x,-y
+x,z,-y
+-z,x,-y
+-x,-z,-y
+y,z,x
+y,-z,-x
+z,y,-x
+-y,z,-x
+-z,-y,-x
+-y,-z,x
+z,-y,x
+-z,y,x
+-x,-y,-z
+y,-x,-z
+x,y,-z
+-y,x,-z
+-x,y,z
+-y,-x,z
+x,-y,z
+y,x,z
+-z,-x,-y
+x,-z,-y
+z,x,-y
+-x,z,-y
+-z,x,y
+-x,-z,y
+z,-x,y
+x,z,y
+-y,-z,-x
+-y,z,x
+-z,-y,x
+y,-z,x
+z,y,x
+y,z,-x
+-z,y,-x
+z,-y,-x
+x,y+1/2,z+1/2
+-y,x+1/2,z+1/2
+-x,-y+1/2,z+1/2
+y,-x+1/2,z+1/2
+x,-y+1/2,-z+1/2
+y,x+1/2,-z+1/2
+-x,y+1/2,-z+1/2
+-y,-x+1/2,-z+1/2
+z,x+1/2,y+1/2
+-x,z+1/2,y+1/2
+-z,-x+1/2,y+1/2
+x,-z+1/2,y+1/2
+z,-x+1/2,-y+1/2
+x,z+1/2,-y+1/2
+-z,x+1/2,-y+1/2
+-x,-z+1/2,-y+1/2
+y,z+1/2,x+1/2
+y,-z+1/2,-x+1/2
+z,y+1/2,-x+1/2
+-y,z+1/2,-x+1/2
+-z,-y+1/2,-x+1/2
+-y,-z+1/2,x+1/2
+z,-y+1/2,x+1/2
+-z,y+1/2,x+1/2
+-x,-y+1/2,-z+1/2
+y,-x+1/2,-z+1/2
+x,y+1/2,-z+1/2
+-y,x+1/2,-z+1/2
+-x,y+1/2,z+1/2
+-y,-x+1/2,z+1/2
+x,-y+1/2,z+1/2
+y,x+1/2,z+1/2
+-z,-x+1/2,-y+1/2
+x,-z+1/2,-y+1/2
+z,x+1/2,-y+1/2
+-x,z+1/2,-y+1/2
+-z,x+1/2,y+1/2
+-x,-z+1/2,y+1/2
+z,-x+1/2,y+1/2
+x,z+1/2,y+1/2
+-y,-z+1/2,-x+1/2
+-y,z+1/2,x+1/2
+-z,-y+1/2,x+1/2
+y,-z+1/2,x+1/2
+z,y+1/2,x+1/2
+y,z+1/2,-x+1/2
+-z,y+1/2,-x+1/2
+z,-y+1/2,-x+1/2
+x+1/2,y,z+1/2
+-y+1/2,x,z+1/2
+-x+1/2,-y,z+1/2
+y+1/2,-x,z+1/2
+x+1/2,-y,-z+1/2
+y+1/2,x,-z+1/2
+-x+1/2,y,-z+1/2
+-y+1/2,-x,-z+1/2
+z+1/2,x,y+1/2
+-x+1/2,z,y+1/2
+-z+1/2,-x,y+1/2
+x+1/2,-z,y+1/2
+z+1/2,-x,-y+1/2
+x+1/2,z,-y+1/2
+-z+1/2,x,-y+1/2
+-x+1/2,-z,-y+1/2
+y+1/2,z,x+1/2
+y+1/2,-z,-x+1/2
+z+1/2,y,-x+1/2
+-y+1/2,z,-x+1/2
+-z+1/2,-y,-x+1/2
+-y+1/2,-z,x+1/2
+z+1/2,-y,x+1/2
+-z+1/2,y,x+1/2
+-x+1/2,-y,-z+1/2
+y+1/2,-x,-z+1/2
+x+1/2,y,-z+1/2
+-y+1/2,x,-z+1/2
+-x+1/2,y,z+1/2
+-y+1/2,-x,z+1/2
+x+1/2,-y,z+1/2
+y+1/2,x,z+1/2
+-z+1/2,-x,-y+1/2
+x+1/2,-z,-y+1/2
+z+1/2,x,-y+1/2
+-x+1/2,z,-y+1/2
+-z+1/2,x,y+1/2
+-x+1/2,-z,y+1/2
+z+1/2,-x,y+1/2
+x+1/2,z,y+1/2
+-y+1/2,-z,-x+1/2
+-y+1/2,z,x+1/2
+-z+1/2,-y,x+1/2
+y+1/2,-z,x+1/2
+z+1/2,y,x+1/2
+y+1/2,z,-x+1/2
+-z+1/2,y,-x+1/2
+z+1/2,-y,-x+1/2
+x+1/2,y+1/2,z
+-y+1/2,x+1/2,z
+-x+1/2,-y+1/2,z
+y+1/2,-x+1/2,z
+x+1/2,-y+1/2,-z
+y+1/2,x+1/2,-z
+-x+1/2,y+1/2,-z
+-y+1/2,-x+1/2,-z
+z+1/2,x+1/2,y
+-x+1/2,z+1/2,y
+-z+1/2,-x+1/2,y
+x+1/2,-z+1/2,y
+z+1/2,-x+1/2,-y
+x+1/2,z+1/2,-y
+-z+1/2,x+1/2,-y
+-x+1/2,-z+1/2,-y
+y+1/2,z+1/2,x
+y+1/2,-z+1/2,-x
+z+1/2,y+1/2,-x
+-y+1/2,z+1/2,-x
+-z+1/2,-y+1/2,-x
+-y+1/2,-z+1/2,x
+z+1/2,-y+1/2,x
+-z+1/2,y+1/2,x
+-x+1/2,-y+1/2,-z
+y+1/2,-x+1/2,-z
+x+1/2,y+1/2,-z
+-y+1/2,x+1/2,-z
+-x+1/2,y+1/2,z
+-y+1/2,-x+1/2,z
+x+1/2,-y+1/2,z
+y+1/2,x+1/2,z
+-z+1/2,-x+1/2,-y
+x+1/2,-z+1/2,-y
+z+1/2,x+1/2,-y
+-x+1/2,z+1/2,-y
+-z+1/2,x+1/2,y
+-x+1/2,-z+1/2,y
+z+1/2,-x+1/2,y
+x+1/2,z+1/2,y
+-y+1/2,-z+1/2,-x
+-y+1/2,z+1/2,x
+-z+1/2,-y+1/2,x
+y+1/2,-z+1/2,x
+z+1/2,y+1/2,x
+y+1/2,z+1/2,-x
+-z+1/2,y+1/2,-x
+z+1/2,-y+1/2,-x
+loop_
+_atom_site_label
+_atom_site_type_symbol
+_atom_site_fract_x
+_atom_site_fract_y
+_atom_site_fract_z
+_atom_site_occupancy
+_atom_site_U_iso_or_equiv
+Nb4 Nb 0 0.165 0.165 0.073 0.0
+B1 B 0.275 0 0 1 0.0
+Nb3 Nb 0.385 0.385 0.385 0.073 0.0
+Nb1 Nb 0 0 0 0.073 0.0
+Fe1 Fe 0 0 0 0.927 0.0
+Fe2 Fe 0.25 0.25 0.25 0.927 0.0
+Nb2 Nb 0.25 0.25 0.25 0.073 0.0
+Fe4 Fe 0 0.165 0.165 0.927 0.0
+Fe3 Fe 0.385 0.385 0.385 0.927 0.0

@@ -116,7 +116,7 @@ def build_parser() -> argparse.ArgumentParser:
     sub = ap.add_subparsers(dest="command")
 
     a = sub.add_parser("analyze", help="파일·폴더를 분석해 판정 결과를 출력")
-    a.add_argument("paths", nargs="+", help=".xrdml / .csv / .xy / .txt 파일 또는 폴더")
+    a.add_argument("paths", nargs="+", help=".xrdml / .rasx / .csv / .xy / .txt 파일 또는 폴더")
     a.add_argument("--out", help="Excel 보고서 경로(.xlsx)")
     a.add_argument("--png", help="그래프 PNG를 저장할 폴더")
     a.add_argument("--csv", help="처리 데이터 CSV를 저장할 폴더")

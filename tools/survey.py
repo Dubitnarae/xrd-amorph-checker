@@ -19,7 +19,7 @@ SUMMARY_COLS = [
     "path", "folder", "file", "sha1", "format", "verdict", "alloy", "nano", "size_nm", "size_err_nm", "size_limit", "size_fwhm", "halo_center", "halo_fwhm", "halo_fwhm_l", "halo_fwhm_r",
     "eta1", "second_center", "chi2_red", "z_max", "z_max_at", "z_min", "z_min_at", "p_chance", "n_contam", "n_detect", "n_suspect", "matches",
     "dl_110", "broad_dbic", "broad_fwhm", "max_counts", "x0", "x1", "step", "n_points", "counting_time",
-    "refit_rounds", "reasons", "warnings", "error",
+    "refit_rounds", "a_A", "si_at", "review_hints", "reasons", "warnings", "error",
 ]
 PEAK_COLS = ["sha1", "file", "two_theta", "z", "level", "height", "fwhm", "counted", "contaminant", "matches",
              "confidence", "halo_center"]
@@ -51,6 +51,9 @@ def _analyze(path: str) -> tuple[dict, list[dict]]:
         "x0": round(float(pt.two_theta[0]), 3), "x1": round(float(pt.two_theta[-1]), 3),
         "step": round(pt.step_deg, 5), "n_points": pt.n_points, "counting_time": pt.counting_time_s,
         "refit_rounds": r.refit_rounds, "reasons": " / ".join(r.reasons), "warnings": " / ".join(r.warnings),
+        "a_A": round(r.lattice["a_A"], 4) if r.lattice else "",
+        "si_at": round(r.lattice["si_at"], 1) if r.lattice and r.lattice["si_at"] is not None else "",
+        "review_hints": " / ".join(r.review_hints),
     })
     if h is not None:
         row.update({

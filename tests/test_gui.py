@@ -15,7 +15,7 @@ from xrdcheck.cli import build_parser  # noqa: E402
 from xrdcheck.gui.app import apply_matplotlib_rc  # noqa: E402
 from xrdcheck.gui.main_window import MainWindow  # noqa: E402
 from xrdcheck.gui.storage import UserStore, validate_library_text  # noqa: E402
-from xrdcheck.gui.widgets.result_table import KEY_ROLE  # noqa: E402
+from xrdcheck.gui.widgets.result_table import KEY_ROLE, result_key  # noqa: E402
 
 
 @pytest.fixture
@@ -48,7 +48,8 @@ def test_open_folder_shows_verdict(window, qtbot, sample_file):
     assert w.table.rowCount() == 1
     assert w.table.item(0, 1).text() == "비정질"
     assert w.table.item(0, 2).text() == ""  # 비정질이면 나노결정 칸은 비움
-    assert w.table.item(0, 3).text() == "44.76"
+    assert w.table.item(0, 3).text() == ""  # 비정질·경계 아님 → 검토 추천 없음
+    assert w.table.item(0, 4).text() == "44.76"
     assert w.table.selected_keys()  # 첫 결과가 자동 선택됨
     html = w.detail.toPlainText()
     assert "비정질" in html and "검출한계" in html and "α-Fe(110)" in html
@@ -186,3 +187,49 @@ def test_user_store_ignores_broken_settings(tmp_path):
 def test_cli_gui_parser():
     args = build_parser().parse_args(["gui", "a.xrdml", "folder"])
     assert args.paths == ["a.xrdml", "folder"]
+
+
+def test_review_mark_filter_accuracy_export(window, qtbot, two_samples, tmp_path):
+    """판정 맞음/틀림 기록 → 목록 검토 칸·결과 패널 → 정확도 → Excel, 다시 열어도 유지."""
+    from openpyxl import load_workbook
+
+    w = window
+    w.open_paths([str(two_samples)])
+    _wait(qtbot, w)
+    assert w.table.rowCount() == 2
+    w.table.selectRow(0)
+    first = w.current_result()
+    assert w.mark_review(None) == 1  # 판정 맞음
+    assert w.table.item(0, 3).text() == "✓ 맞음"
+    w.table.selectRow(1)
+    second = w.current_result()
+    w.mark_review("결정상 검출")  # 틀림 — 실제는 결정상 검출
+    row = w.table._row_of(result_key(second))
+    assert w.table.item(row, 3).text() == "✗ → 결정상 검출"
+    assert "내 판정: 결정상 검출" in w.detail.toPlainText()
+    w.edit_review_memo("메모 시험")
+    assert w.reviews.get(second)["memo"] == "메모 시험"
+
+    now, all_ = w.accuracy()
+    assert now["n"] == 2 and now["correct"] == 1 and len(now["disagree"]) == 1
+
+    w.act_review_filter.setChecked(True)
+    w.apply_review_filter()
+    hidden = [w.table.isRowHidden(r) for r in range(2)]
+    assert hidden.count(False) == 1  # 틀린 시료만 남음(둘 다 비정질·경계 아님 → 추천 없음)
+    w.act_review_filter.setChecked(False)
+    w.apply_review_filter()
+
+    xl = w.export_excel(tmp_path / "out.xlsx")
+    ws = load_workbook(xl)["요약"]
+    head = [c.value for c in ws[1]]
+    assert {"내 판정", "판정 일치", "검토 메모", "검토 추천 이유", "격자상수 a(Å, 참고)", "Si 함량(at%, 참고)"} <= set(head)
+    rv = load_workbook(w.export_reviews(tmp_path / "rev.xlsx"))
+    assert rv["검토 기록"].max_row == 3 and rv["혼동표"]["A1"].value.startswith("내 판정")
+
+    w.table.selectRow(0)
+    w.clear_review()
+    assert w.reviews.get(first) is None
+    w2 = MainWindow(config_dir=w.store.dir, show_dialogs=False)  # 같은 설정 폴더로 다시 열면 검토가 남아 있음
+    qtbot.addWidget(w2)
+    assert w2.reviews.get(second)["user_verdict"] == "결정상 검출"

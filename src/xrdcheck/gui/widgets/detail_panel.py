@@ -33,13 +33,32 @@ def _f(v, n, unit=""):
     return "-" if v is None else f"{v:.{n}f}{unit}"
 
 
-def result_html(r: AnalysisResult) -> str:
+def review_html(r: AnalysisResult, review: dict | None) -> str:
+    out = []
+    if review:
+        ok = review["user_verdict"] == r.verdict.value
+        color = "#2e7d32" if ok else "#c62828"
+        out.append(f"<p style='color:{color}'><b>내 판정: {escape(review['user_verdict'])}</b> "
+                   f"({'프로그램 판정과 같음' if ok else '프로그램 판정과 다름'}) "
+                   f"<span class='muted'>검토 {escape(review['reviewed_at'][:10])}, 당시 v{escape(review['program_version'])}"
+                   f" 판정 {escape(review['program_verdict'])}</span></p>")
+        if review.get("memo"):
+            out.append(f"<p class='muted'>메모: {escape(review['memo'])}</p>")
+    if r.review_hints:
+        out.append("<p><span style='color:#1565c0'><b>검토 추천</b></span> <span class='muted'>— 확인 후 아래 "
+                   "[판정 맞음]/[판정 틀림]을 눌러 주세요</span></p><ul>"
+                   + "".join(f"<li>{escape(h)}</li>" for h in r.review_hints) + "</ul>")
+    return "".join(out)
+
+
+def result_html(r: AnalysisResult, review: dict | None = None) -> str:
     p, h = r.pattern, r.halo
     v = r.verdict.value
     out = [CSS, f"<h2 style='color:{VERDICT_COLORS.get(v, '#000')}'>{escape(v)}</h2>",
            f"<p>{escape(r.sentence)}</p>"]
     if r.reasons:
         out.append("<p class='muted'>근거: " + escape(" / ".join(r.reasons)) + "</p>")
+    out.append(review_html(r, review))
     if r.nano:
         lo, hi = r.nano["window"]
         out.append(f"<p><b>{escape(r.nano['label'])}</b> <span class='muted'>— 주 halo 범위 {lo:.1f}–{hi:.1f}°"
@@ -58,6 +77,24 @@ def result_html(r: AnalysisResult) -> str:
             if r.nano.get("xc") is not None:
                 out.append(_row("결정 분율 Xc(참고)", f"{r.nano['xc'] * 100:.1f}%"))
             out.append("</table>")
+        if r.nano.get("secondary_peaks"):
+            out.append("<p class='muted'>2차 상 피크(붕화물·fcc 등, 나노결정 판단에서 제외): "
+                       + escape(", ".join(f"{t:.2f}° {m}" for t, m in r.nano["secondary_peaks"])) + "</p>")
+
+    if r.lattice:
+        from xrdcheck.analysis.lattice import format_si
+
+        lat = r.lattice
+        out.append("<h3>격자상수 · Si 함량 (참고)</h3><table>")
+        out.append(_row("a (bcc, 가중 평균)", f"{lat['a_A']:.4f} ± {lat['a_err_A']:.4f} Å"))
+        out += [_row(f"  {u['label']} {u['two_theta']:.2f}°", f"{u['a_A']:.4f} Å") for u in lat["lines"]]
+        if lat["a_extrap_A"] is not None:
+            out.append(_row("a (높이 오차 외삽)", f"{lat['a_extrap_A']:.4f} Å"))
+        out.append(_row("Si 함량 (Fe–Si 2원계 환산)", format_si(lat)))
+        out.append("</table>")
+        if lat["si_note"]:
+            out.append(f"<p class='muted'>{escape(lat['si_note'])}</p>")
+        out.append("<p class='muted'>2θ 영점·시료 높이 오차 0.02°가 약 0.5 at%에 해당합니다. Co·Ni·Al·P 등이 고용되면 맞지 않습니다.</p>")
 
     if h is not None:
         out.append("<h3>halo</h3><table>")
@@ -133,8 +170,8 @@ class DetailPanel(QTextBrowser):
     def clear_result(self) -> None:
         self.setHtml(CSS + "<p class='muted'>목록에서 시료를 고르면 판정 근거가 여기에 나옵니다.</p>")
 
-    def set_result(self, r: AnalysisResult) -> None:
-        self.setHtml(result_html(r))
+    def set_result(self, r: AnalysisResult, review: dict | None = None) -> None:
+        self.setHtml(result_html(r, review))
 
     def set_compare(self, results: list[AnalysisResult]) -> None:
         rows = "".join(

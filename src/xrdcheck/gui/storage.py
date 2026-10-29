@@ -86,6 +86,14 @@ def validate_library_text(text: str) -> str | None:
                     raise ValueError
             except (TypeError, ValueError):
                 return f"'{ph['name']}'의 cubic_a_range_A는 [최소, 최대](Å, 0 < 최소 ≤ 최대)여야 합니다."
+        sr = ph.get("d_scale_range")
+        if sr is not None:
+            try:
+                lo, hi = (float(v) for v in sr)
+                if not 0.9 <= lo <= hi <= 1.1:
+                    raise ValueError
+            except (TypeError, ValueError):
+                return f"'{ph['name']}'의 d_scale_range는 [최소, 최대](0.9–1.1)여야 합니다."
         for ln in lines:
             try:
                 if float(ln["rel"]) <= 0 or not str(ln["hkl"]).isdigit():

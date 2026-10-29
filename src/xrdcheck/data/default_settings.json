@@ -59,7 +59,16 @@
     "scherrer_k": 0.9,
     "_scherrer_comment": "기기 폭 b(2θ): 표준시료 미측정 — 실측 1,020개 중 강한 결정 피크(z ≥ 30) FWHM 하위 1–5%로 추정(2026-10-28). 순수 폭 β = √(B² − b²)",
     "scherrer_instrument_fwhm_deg": [[44.7, 0.10], [65.0, 0.11], [82.5, 0.13]],
-    "scherrer_instrument_measured": false
+    "scherrer_instrument_measured": false,
+    "_exclude_secondary_comment": "붕화물·인화물·fcc 등 2차 상(phases.json role = secondary)에만 매칭된 피크는 나노결정 판단에서 뺀다",
+    "exclude_secondary_peaks": true
+  },
+  "lattice": {
+    "_comment": "α-Fe(Si) 격자상수와 Si 함량 환산(참고값). 이 상들에 매칭된 검출 피크로 a를 낸다. Fe–Si 2원계 기준",
+    "phases": ["α-Fe(Si)", "α-Fe", "Fe3Si(DO3)"],
+    "two_theta_uncertainty_deg": 0.02,
+    "_si_comment": "(a Å, Si at%) 점을 직선으로 보간. 순수 Fe 2.8665(Polcarová 1988) / 7 at% 2.8617(같은 문헌 기울기 −0.000069 nm/at%) / 18 at% 2.840(FINEMET 나노결정 문헌값) / 25 at% 2.8275(Fe3Si DO3 5.655 Å ÷ 2, Farquhar 1945·COD 9015110)",
+    "si_calibration": [[2.8665, 0], [2.8617, 7], [2.8400, 18], [2.82755, 25]]
   },
   "broad_component": {
     "line": "α-Fe(110)",

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "xrdcheck"
-version = "0.7.0"
+version = "0.8.0"
 description = "XRD 비정질 판정 도우미 — halo 피팅과 결정 피크 검출"
 authors = [{ name = "KIM YEONGDO" }]
 requires-python = ">=3.12"
@@ -19,6 +19,7 @@ dependencies = [
 [project.optional-dependencies]
 dev = ["pytest>=8", "pytest-qt>=4.4"]
 build = ["pyinstaller>=6.10"]
+cards = ["pymatgen>=2024.1"]  # tools/make_phase_cards.py(상 카드 계산)만 — 프로그램에는 필요 없음
 
 [tool.setuptools.packages.find]
 where = ["src"]
