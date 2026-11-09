@@ -10,9 +10,10 @@ build/
 dist/
 out/
 
-# ── 비공개(저장소에 올리지 않음) — 다른 PC로는 NAS·USB로 옮긴다(CLAUDE.md '다른 PC에서 이어 하기') ──
+# ── 비공개(저장소에 올리지 않음) — 다른 PC로는 NAS·USB로 옮긴다(.claude/skills/xrd-setup) ──
 # 작업 지시·계획·개발 기록
 CLAUDE.md
+.claude/
 PLAN.md
 docs/PLAN.md
 docs/DEVLOG.md
@@ -30,3 +31,5 @@ docs/img/
 
 # PyInstaller가 만드는 spec(빌드 옵션은 build.ps1에 있음)
 *.spec
+# 사내 원본 자료 폴더(1.5 GB, 공개 금지)
+/내부정보) XRD/
