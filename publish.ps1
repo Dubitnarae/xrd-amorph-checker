@@ -42,4 +42,5 @@ if (-not (git tag -l $tag)) { git tag -a $tag -m "$tag" }
 git push origin $tag
 & $gh release create $tag $zip "$zip.sha256" --repo $repo --title "XRD 비정질 판정 도우미 $tag" --notes-file $notes --latest --verify-tag
 if ($LASTEXITCODE -ne 0) { throw "릴리스 게시 실패" }
+& .\verify_release.ps1 -Repo $repo -Tag $tag -Files $zip, "$zip.sha256"
 Write-Host "완료: https://github.com/$repo/releases/tag/$tag"

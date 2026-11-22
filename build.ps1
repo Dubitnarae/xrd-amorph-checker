@@ -34,6 +34,7 @@ Copy-Item CHANGELOG.md dist\XRD_Checker\CHANGELOG.md -Force
 $zip = "dist\XRD_Checker_v$version.zip"
 if (Test-Path $zip) { Remove-Item $zip -Force }
 Compress-Archive -Path dist\XRD_Checker -DestinationPath $zip
+& .\verify_release.ps1 -Zip $zip -Base dist   # 깨지면 여기서 멈춤
 $hash = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLower()
 "$hash  XRD_Checker_v$version.zip" | Out-File "$zip.sha256" -Encoding ascii
 Write-Host "완료: $zip"
